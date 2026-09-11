@@ -1,0 +1,22 @@
+{
+  "name": "driver-realtime-map",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.1",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "5.6.3",
+    "vite": "^5.4.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

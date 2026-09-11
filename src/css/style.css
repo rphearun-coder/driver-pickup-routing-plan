@@ -1,0 +1,513 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+svg {
+  max-width: 100%;
+  display: block;
+}
+
+.driver-panel {
+  --dp-green: #1a9c4b;
+  --dp-green-dark: #147a3b;
+  --dp-red: #c62828;
+  --dp-red-dark: #a01f1f;
+  --dp-gray-900: #1f2937;
+  --dp-gray-700: #374151;
+  --dp-gray-500: #6b7280;
+  --dp-gray-400: #9aa0a6;
+  --dp-gray-200: #e5e7eb;
+  --dp-gray-100: #f1f3f4;
+  --dp-gray-50: #f7f8fa;
+  --dp-radius: 8px;
+
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 10;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: var(--dp-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.driver-panel .panel-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+.driver-panel .panel-header:focus-visible {
+  outline: 2px solid var(--dp-green);
+  outline-offset: -2px;
+}
+.driver-panel .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.driver-panel .status-dot.online {
+  background: var(--dp-green);
+  box-shadow: 0 0 0 2px rgba(26, 156, 75, 0.15);
+}
+.driver-panel .status-dot.offline {
+  background: var(--dp-gray-400);
+  box-shadow: 0 0 0 2px rgba(154, 160, 166, 0.15);
+}
+.driver-panel .status-text {
+  flex: 1;
+  font-weight: 700;
+  font-size: 10.5px;
+  color: var(--dp-gray-900);
+}
+.driver-panel .conn-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.driver-panel .conn-dot.connected {
+  background: var(--dp-green);
+}
+.driver-panel .conn-dot.disconnected {
+  background: var(--dp-red);
+}
+.driver-panel .chevron {
+  width: 10px;
+  height: 10px;
+  color: var(--dp-gray-500);
+  flex-shrink: 0;
+}
+
+.driver-panel .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 8px 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.driver-panel .tagline {
+  margin: 0;
+  color: var(--dp-gray-700);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.driver-panel .tagline.muted {
+  color: var(--dp-gray-500);
+  text-align: center;
+  padding: 5px 0;
+}
+.driver-panel .tagline.error {
+  color: var(--dp-red);
+}
+
+.driver-panel .login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.driver-panel .login-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 24px;
+  padding: 4px 7px;
+  border: 1px solid var(--dp-gray-200);
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--dp-gray-900);
+}
+.driver-panel .login-form input:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
+.driver-panel .phone-input {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--dp-gray-200);
+  border-radius: 5px;
+  overflow: hidden;
+  background: #fff;
+}
+.driver-panel .phone-input:focus-within {
+  border-color: #1a73e8;
+}
+.driver-panel .phone-prefix {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  background: var(--dp-gray-50);
+  color: var(--dp-gray-700);
+  font-size: 11px;
+  font-weight: 600;
+  border-right: 1px solid var(--dp-gray-200);
+}
+.driver-panel .phone-input input {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  padding: 4px 7px;
+  border: none;
+  font-size: 11px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--dp-gray-900);
+}
+.driver-panel .phone-input input:focus {
+  outline: none;
+}
+
+.driver-panel .btn {
+  width: 100%;
+  min-height: 22px;
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, transform 0.06s ease;
+}
+.driver-panel .btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.driver-panel .btn:disabled {
+  background: var(--dp-gray-200);
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.driver-panel .btn-online {
+  background: var(--dp-green);
+}
+.driver-panel .btn-online:hover:not(:disabled) {
+  background: var(--dp-green-dark);
+}
+.driver-panel .btn-stop {
+  flex: 1;
+  background: var(--dp-red);
+}
+.driver-panel .btn-stop:hover:not(:disabled) {
+  background: var(--dp-red-dark);
+}
+.driver-panel .btn-drive {
+  flex: 1;
+  background: var(--dp-green);
+}
+.driver-panel .btn-drive:hover:not(:disabled) {
+  background: var(--dp-green-dark);
+}
+
+.driver-panel .action-row {
+  display: flex;
+  gap: 4px;
+}
+.driver-panel .btn-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--dp-gray-200);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--dp-gray-700);
+  font-size: 11px;
+  cursor: pointer;
+}
+.driver-panel .btn-icon:hover {
+  background: var(--dp-gray-50);
+}
+.driver-panel .btn-icon .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.driver-panel .link-offline {
+  border: none;
+  background: transparent;
+  color: var(--dp-gray-500);
+  font-size: 9px;
+  text-align: center;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.driver-panel .offline-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.driver-panel .pickup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+.driver-panel .pickup-card {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 5px;
+  border: 1px solid var(--dp-gray-200);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.driver-panel .pickup-card:hover {
+  background: var(--dp-gray-50);
+}
+.driver-panel .pickup-card.selected {
+  border-color: var(--dp-green);
+  background: rgba(26, 156, 75, 0.06);
+}
+.driver-panel .pickup-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.driver-panel .pickup-card:disabled:hover {
+  background: #fff;
+}
+.driver-panel .pickup-badge {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dp-gray-100);
+  color: var(--dp-gray-700);
+  font-size: 8px;
+  font-weight: 700;
+}
+.driver-panel .pickup-card.selected .pickup-badge {
+  background: var(--dp-green);
+  color: #fff;
+}
+.driver-panel .pickup-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.driver-panel .pickup-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dp-gray-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.driver-panel .pickup-meta {
+  font-size: 8.5px;
+  color: var(--dp-gray-500);
+}
+.driver-panel .pickup-status {
+  flex-shrink: 0;
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--dp-gray-500);
+}
+
+.driver-panel .date-filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid var(--dp-gray-200);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--dp-gray-700);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.driver-panel .date-filter-toggle:hover {
+  background: var(--dp-gray-50);
+}
+.driver-panel .date-filter-toggle .chevron {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+/* PickupFilterModal is teleported to <body>, so it sits outside .driver-panel —
+   these rules are deliberately unscoped and self-contained (no --dp-* var reliance). */
+.pickup-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.pickup-filter-modal {
+  width: 100%;
+  max-width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+.pickup-filter-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+.pickup-filter-close-x {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.pickup-filter-close-x:hover {
+  color: #1f2937;
+}
+.pickup-filter-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+}
+.pickup-filter-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pickup-filter-label:not(:first-child) {
+  margin-top: 8px;
+}
+.pickup-filter-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pickup-filter-date-row input[type='date'] {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #1f2937;
+}
+.pickup-filter-today-btn {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pickup-filter-today-btn:hover {
+  background: #f7f8fa;
+}
+.pickup-filter-segment {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.pickup-filter-segment-btn {
+  min-height: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.pickup-filter-segment-btn:hover {
+  background: #f7f8fa;
+}
+.pickup-filter-segment-btn.active {
+  background: #1a9c4b;
+  border-color: #1a9c4b;
+  color: #fff;
+}
+.pickup-filter-close-btn {
+  width: calc(100% - 28px);
+  margin: 0 14px 14px;
+  min-height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: #1a9c4b;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pickup-filter-close-btn:hover {
+  background: #147a3b;
+}
