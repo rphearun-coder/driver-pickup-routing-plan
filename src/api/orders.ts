@@ -9,6 +9,7 @@ const GET_ORDER_LIST_QUERY = `
       results {
         id
         driverId
+        onRoute
         estimatedTotalParcel
         status
         pickupAddress
@@ -29,6 +30,7 @@ const GET_ORDER_LIST_QUERY = `
 
 interface OrderApiItem {
   id: string;
+  onRoute?: boolean;
   status?: OrderStatus;
   pickupAddress?: string;
   pickupLatitude?: number | string;
@@ -67,6 +69,7 @@ function toPickupPoint(item: OrderApiItem, index: number): PickupPoint | null {
     path: [origin],
     label: item.partner?.shop?.shopName ?? item.partner?.fullName ?? `Pickup ${index + 1}`,
     status: item.status,
+    onRoute: item.onRoute,
     partnerName: item.partner?.fullName,
     address: item.pickupAddress,
     estimatedDistanceMeters: item.estimatedDistanceMeters,
@@ -75,6 +78,16 @@ function toPickupPoint(item: OrderApiItem, index: number): PickupPoint | null {
     estimatedDurationSecondsText: item.estimatedDurationSecondsText,
     parcelCount: item.estimatedTotalParcel,
   };
+}
+
+export function filterSharedOrder(
+  pickup: PickupPoint,
+  orderId?: string,
+  onRoute?: boolean,
+): PickupPoint | null {
+  if (orderId && pickup.id !== orderId) return null;
+  if (onRoute !== undefined && pickup.onRoute !== onRoute) return null;
+  return pickup;
 }
 
 // dateStr is a local calendar date ("YYYY-MM-DD"); the range covers that whole local day.
@@ -106,4 +119,25 @@ export async function fetchDriverOrders(
   return data.getOrderListByUser.results
     .map(toPickupPoint)
     .filter((pickup): pickup is PickupPoint => pickup !== null);
+}
+
+const UPDATE_ON_ROUTE_MUTATION = `
+  mutation UpdateOnRoute($id: String!) {
+    updateOnRoute(id: $id)
+  }
+`;
+
+interface UpdateOnRouteResponse {
+  updateOnRoute: boolean;
+}
+
+export async function updateOrderOnRoute(driverToken: string, orderId: string): Promise<boolean> {
+  if (!driverToken || !orderId) return false;
+  const data = await gqlRequest<UpdateOnRouteResponse>(
+    ORDER_SERVICE_URL,
+    UPDATE_ON_ROUTE_MUTATION,
+    { id: orderId },
+    driverToken
+  );
+  return data.updateOnRoute;
 }

@@ -65,6 +65,24 @@ function ensurePulsingMarkerStyle(): void {
     .pulsing-marker.online .pulsing-marker-dot {
       animation: pulsing-marker-breathe 2s ease-in-out infinite;
     }
+    .pulsing-marker-dot.offline {
+      background: #9aa0a6;
+    }
+    .pulsing-marker-icon {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
     @keyframes pulsing-marker-pulse {
       0% { transform: scale(1); opacity: 0.7; }
       100% { transform: scale(4.5); opacity: 0; }
@@ -110,7 +128,8 @@ function createPulsingMarker(google: any, map: any, position: LatLng, onClick: (
         '<span class="pulsing-marker-ring pulsing-marker-ring--delay1"></span>' +
         '<span class="pulsing-marker-ring pulsing-marker-ring--delay2"></span>' +
         '<span class="pulsing-marker-halo"></span>' +
-        '<span class="pulsing-marker-dot"></span>';
+        `<span class="pulsing-marker-dot${this.online ? '' : ' offline'}"></span>` +
+        '<span class="pulsing-marker-icon">🛵</span>';
       div.addEventListener('click', onClick);
       this.div = div;
       this.getPanes().overlayMouseTarget.appendChild(div);
@@ -138,6 +157,7 @@ function createPulsingMarker(google: any, map: any, position: LatLng, onClick: (
     setOnline(online: boolean) {
       this.online = online;
       this.div?.classList.toggle('online', online);
+      this.div?.querySelector('.pulsing-marker-dot')?.classList.toggle('offline', !online);
     }
   }
 

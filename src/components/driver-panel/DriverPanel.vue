@@ -29,8 +29,10 @@
       <template v-else-if="isPlayingRoute">
         <p class="tagline">
           <template v-if="isSimulating">Driving to <strong>{{ activePickupName }}</strong>{{ isPaused ? ' — paused' : '…' }}</template>
+          <template v-else-if="hasLivePosition">Driving to <strong>{{ activePickupName }}</strong>…</template>
           <template v-else>Route set to <strong>{{ activePickupName }}</strong> — waiting for the driver's live position…</template>
         </p>
+        <p v-if="locationError" class="tagline error">{{ locationError }}</p>
         <div class="action-row">
           <button v-if="isSimulating" type="button" class="btn-icon" :title="isPaused ? 'Resume' : 'Pause'" @click="togglePause">
             <component :is="isPaused ? IconPlay : IconPause" class="icon" />
@@ -56,8 +58,16 @@
           </button>
         </div>
         <p v-if="presenceError" class="tagline error">{{ presenceError }}</p>
+        <p v-if="locationError" class="tagline error">{{ locationError }}</p>
         <div class="offline-row">
           <button type="button" class="link-offline" :disabled="isSyncing" @click="$emit('toggle-online')">Go offline</button>
+          <button
+            type="button"
+            class="link-offline"
+            @click="$emit('invite', selectedPickupIndex === '' ? undefined : props.pickups[selectedPickupIndex])"
+          >
+            Copy link
+          </button>
           <button type="button" class="link-offline" @click="$emit('logout')">Log out</button>
           <slot name="dev-tools" />
         </div>
@@ -94,6 +104,9 @@ const props = withDefaults(
     isPlayingRoute?: boolean;
     isPaused?: boolean;
     isSimulating?: boolean;
+    hasLivePosition?: boolean;
+    activePickupId?: string;
+    locationError?: string;
   }>(),
   {
     defaultDriverId: '',
@@ -110,6 +123,9 @@ const props = withDefaults(
     isPlayingRoute: false,
     isPaused: false,
     isSimulating: true,
+    hasLivePosition: false,
+    activePickupId: '',
+    locationError: '',
   }
 );
 
@@ -117,11 +133,12 @@ const emit = defineEmits<{
   login: [payload: { phoneNumber: string; password: string }];
   logout: [];
   'toggle-online': [];
+  invite: [pickup?: PickupPoint];
   refresh: [];
   'change-filter': [payload: { date: string; pickupTime: PickupTimeSlot | '' }];
   'view-pickup': [payload: { lat: number; lon: number }];
   'preview-route': [payload: { lat: number; lon: number }];
-  'play-route': [payload: { lat: number; lon: number }];
+  'play-route': [payload: { id?: string; onRoute?: boolean; lat: number; lon: number }];
   'pause-route': [];
   'resume-route': [];
   'stop-route': [];
@@ -151,6 +168,19 @@ watch(
   }
 );
 
+// After a page refresh, selectedPickupIndex resets to '' along with the rest of this
+// component's state, even though the parent may be resuming a route that was already
+// in progress. This re-attaches the label once the matching pickup shows up in the list.
+watch(
+  () => [props.pickups, props.activePickupId] as const,
+  ([list, id]) => {
+    if (!id || selectedPickupIndex.value !== '') return;
+    const index = list.findIndex((pickup) => pickup.id === id);
+    if (index !== -1) selectedPickupIndex.value = index;
+  },
+  { immediate: true }
+);
+
 function selectPickup(index: number): void {
   selectedPickupIndex.value = index;
   const pickup = props.pickups[index];
@@ -174,6 +204,11 @@ function onDriveClick(): void {
   const pickup = props.pickups[selectedPickupIndex.value];
   const origin = pickup?.path[0];
   if (!origin) return;
-  emit('play-route', { lat: Number(origin.lat), lon: Number(origin.lng) });
+  emit('play-route', {
+    id: pickup.id,
+    onRoute: pickup.onRoute,
+    lat: Number(origin.lat),
+    lon: Number(origin.lng),
+  });
 }
 </script>

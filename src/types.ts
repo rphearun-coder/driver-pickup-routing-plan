@@ -27,6 +27,7 @@ export interface PickupPoint {
   path: LatLng[];
   label: string;
   status?: OrderStatus;
+  onRoute?: boolean;
   partnerName?: string;
   address?: string;
   estimatedDistanceMeters?: number;

@@ -58,19 +58,18 @@ const client = mqtt.connect(MQTT_URL, {
 client.on('connect', () => {
   console.log(`Connected. Publishing ${COUNT} simulated driver(s) every ${INTERVAL_MS}ms. Ctrl+C to stop.`);
 
-  for (let n = 0; n < COUNT; n++) {
-    const driverId = n === 0 ? BASE_DRIVER_ID : `${BASE_DRIVER_ID}-${n + 1}`;
+  for (let driverIndex = 0; driverIndex < COUNT; driverIndex++) {
+    const driverId = driverIndex === 0 ? BASE_DRIVER_ID : `${BASE_DRIVER_ID}-${driverIndex + 1}`;
     const topic = `/topic/driver/${driverId}/location`;
-    // spread drivers apart so they don't stack
-    let lat = START_LAT + n * STEP_DEG * 5;
-    let lon = START_LON + n * STEP_DEG * 5;
+    let latitude = START_LAT + driverIndex * STEP_DEG * 5;
+    let longitude = START_LON + driverIndex * STEP_DEG * 5;
 
     setInterval(() => {
-      lat += (Math.random() - 0.5) * STEP_DEG;
-      lon += (Math.random() - 0.5) * STEP_DEG;
+      latitude += (Math.random() - 0.5) * STEP_DEG;
+      longitude += (Math.random() - 0.5) * STEP_DEG;
 
-      const payload = { driverId, lat, lon, driverShift: 1, shiftType: 2 };
-      client.publish(topic, JSON.stringify(payload));
+      const payload = { driverId, lat: latitude, lon: longitude, driverShift: 2, shiftType: 1 };
+      client.publish(topic, JSON.stringify(payload), { qos: 0, retain: true });
       console.log('Published:', payload);
     }, INTERVAL_MS);
   }

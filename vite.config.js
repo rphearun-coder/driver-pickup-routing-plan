@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
+import { generateDevHttpsCertificate } from './dev-https-cert.js';
 
 export default defineConfig({
   plugins: [vue()],
@@ -10,9 +11,14 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
     port: 5173,
-    // The docker-compose nginx proxy forwards requests with Host: driver-tracker.local —
-    // Vite 5's dev-server host check rejects any Host it doesn't recognize by default.
-    allowedHosts: ['driver-tracker.local'],
+    allowedHosts: true,
+    // HTTPS is required for navigator.geolocation to work at all when testing over a LAN
+    // address (e.g. https://192.168.x.x:5173 on a phone) — browsers block it outright on
+    // any non-HTTPS, non-localhost origin. See dev-https-cert.js for why this isn't just
+    // @vitejs/plugin-basic-ssl. Your phone's browser will still show a one-time
+    // "connection not private" warning for the self-signed cert — tap through it once.
+    https: generateDevHttpsCertificate(),
   },
 });

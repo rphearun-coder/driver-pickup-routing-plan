@@ -26,6 +26,10 @@ export function useDriverPresence({ currentDriverId, driverToken, onOnlineChange
       const status = await getOnlineStatus(driverToken.value);
       setOnline(status === 'ONLINE');
     } catch (err) {
+      if (!driverToken.value) {
+        setOnline(false);
+        return;
+      }
       presenceError.value = err instanceof Error ? err.message : 'Failed to load online status';
     }
   }
@@ -51,6 +55,10 @@ export function useDriverPresence({ currentDriverId, driverToken, onOnlineChange
       const status = await toggleOnlineStatus(driverToken.value);
       setOnline(status === 'ONLINE');
     } catch (err) {
+      if (!driverToken.value) {
+        setOnline(false);
+        return;
+      }
       presenceError.value = err instanceof Error ? err.message : 'Failed to update online status';
     } finally {
       isSyncing.value = false;

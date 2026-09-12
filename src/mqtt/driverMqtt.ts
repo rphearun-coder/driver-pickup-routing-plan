@@ -1,14 +1,19 @@
 import mqtt, { type MqttClient } from 'mqtt';
 import type { ConnectionStatus, DriverLocation } from '../types';
 
-const TOPIC_PATTERN = /^\/topic\/driver\/([^/]+)\/location$/;
+const DRIVER_LOCATION_TOPIC_PATTERN = /^\/topic\/driver\/([^/]+)\/location$/;
+const DRIVER_LOCATION_TOPIC_SUFFIX = '/location';
+// retain: true — lets the broker hand a fresh subscriber (e.g. a page refresh, or the
+// public tracking link opening for the first time) the driver's last known position
+// immediately, instead of leaving the map blank until the next live publish.
+const MQTT_PUBLISH_OPTIONS = { qos: 0 as const, retain: true };
 
 function topicForDriver(driverId: string): string {
-  return `/topic/driver/${driverId}/location`;
+  return `/topic/driver/${driverId}${DRIVER_LOCATION_TOPIC_SUFFIX}`;
 }
 
 function driverIdFromTopic(topic: string): string | null {
-  const match = topic.match(TOPIC_PATTERN);
+  const match = topic.match(DRIVER_LOCATION_TOPIC_PATTERN);
   return match ? match[1] : null;
 }
 
@@ -53,11 +58,11 @@ export function connectDriverMqtt({
   });
 
   client.on('message', (topic, payloadBuffer) => {
-    const driverId = driverIdFromTopic(topic);
-    if (!driverId) return;
     try {
       const data = JSON.parse(payloadBuffer.toString());
-      onLocation?.({ ...data, driverId: data.driverId ?? driverId });
+      const driverId = data.driverId ?? driverIdFromTopic(topic);
+      if (!driverId) return;
+      onLocation?.({ ...data, driverId });
     } catch (err) {
       console.error('Failed to parse MQTT payload:', err, payloadBuffer.toString());
     }
@@ -73,12 +78,28 @@ export interface PublishDriverLocationOptions {
   shiftType?: number;
 }
 
+interface DriverLocationPayload {
+  driverId: string;
+  lat: number;
+  lon: number;
+  driverShift: number;
+  shiftType: number;
+}
+
+function validCoordinate(value: number | string, min: number, max: number): number | null {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) && coordinate >= min && coordinate <= max ? coordinate : null;
+}
+
 export function publishDriverLocation(
   client: MqttClient | undefined | null,
   driverId: string,
-  { lat, lon, driverShift = 1, shiftType = 1 }: PublishDriverLocationOptions
+  { lat, lon, driverShift = 2, shiftType = 1 }: PublishDriverLocationOptions
 ): void {
   if (!client || client.disconnecting) return;
-  const payload = { driverId, lat, lon, driverShift, shiftType };
-  client.publish(topicForDriver(driverId), JSON.stringify(payload));
+  const latitude = validCoordinate(lat, -90, 90);
+  const longitude = validCoordinate(lon, -180, 180);
+  if (!driverId.trim() || latitude === null || longitude === null) return;
+  const payload: DriverLocationPayload = { driverId, lat: latitude, lon: longitude, driverShift, shiftType };
+  client.publish(topicForDriver(driverId), JSON.stringify(payload), MQTT_PUBLISH_OPTIONS);
 }
