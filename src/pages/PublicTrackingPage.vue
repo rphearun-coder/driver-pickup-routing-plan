@@ -44,12 +44,17 @@ watch(driverId, (id) => (currentDriverId.value = id), { immediate: true });
 const { driverLocations, locationVersion } = useDriverLocations({ currentDriverId });
 
 let routePolyline: any = null;
-let routeDrawnFor = ''; // `${orderId}:${driverId}` — avoids re-hitting Directions on every location tick
+let lastRouteKey = ''; // `${orderId}:${driverId}` — forces an immediate redraw when the pickup/driver changes
+let lastRouteRefreshAt = 0;
+const ROUTE_REFRESH_MIN_INTERVAL_MS = 20000; // throttle so a ~4s location feed doesn't hammer Directions
 
 async function drawRoute(google: any, map: any, origin: LatLng, destination: LatLng): Promise<void> {
   const key = `${pickupMarker.value?.id ?? ''}:${driverId.value}`;
-  if (routeDrawnFor === key) return;
-  routeDrawnFor = key;
+  const now = Date.now();
+  const isNewTarget = key !== lastRouteKey;
+  if (!isNewTarget && now - lastRouteRefreshAt < ROUTE_REFRESH_MIN_INTERVAL_MS) return;
+  lastRouteKey = key;
+  lastRouteRefreshAt = now;
 
   try {
     const directionsService = new google.maps.DirectionsService();
@@ -71,7 +76,7 @@ async function drawRoute(google: any, map: any, origin: LatLng, destination: Lat
     });
   } catch (err) {
     console.error('Failed to fetch tracking route:', err);
-    routeDrawnFor = ''; // let a later tick retry
+    lastRouteRefreshAt = 0; // let the next tick retry immediately instead of waiting out the throttle
   }
 }
 

@@ -203,7 +203,7 @@ async function handleToggleOnline(): Promise<void> {
 }
 
 const driveSpeedMs = ref(1000);
-const { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRoute, resumeRoute, stopRoute } = useRoutePlayback({
+const { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRoute, resumeRoute, stopRoute, refreshRoute } = useRoutePlayback({
   getGoogle: () => driverMapRef.value?.getGoogle(),
   getMap: () => driverMapRef.value?.getMap(),
   getOrigin: myPosition,
@@ -211,6 +211,10 @@ const { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRo
   getDriverId: () => activeDriverId.value,
   getStepIntervalMs: () => driveSpeedMs.value,
 });
+
+// Each real GPS update (live mode) should nudge the drawn route to follow the driver —
+// refreshRoute() itself throttles how often that actually re-hits the Directions API.
+watch(locationVersion, () => refreshRoute());
 
 // Any transition out of "playing" — manual stop, a simulated drive finishing on its own,
 // or a mode switch — should drop the resume record so a later refresh doesn't replay it.

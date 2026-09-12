@@ -29,6 +29,9 @@ export function useRoutePlayback({
   let routeTimer: ReturnType<typeof setInterval> | null = null;
   let activePath: any[] | null = null;
   let activeIndex = 0;
+  let activeDestination: LatLng | null = null;
+  let lastRouteRefreshAt = 0;
+  const ROUTE_REFRESH_MIN_INTERVAL_MS = 20000;
 
   async function fetchDrivingPath(destination: LatLng): Promise<any[] | null> {
     const google = getGoogle();
@@ -82,8 +85,37 @@ export function useRoutePlayback({
     routePolyline = null;
     activePath = null;
     activeIndex = 0;
+    activeDestination = null;
+    lastRouteRefreshAt = 0;
     isPlayingRoute.value = false;
     isPaused.value = false;
+  }
+
+  // In live mode the drawn line was only ever computed once, from wherever the driver was
+  // when "Drive to pickup" was tapped — it never followed them after that. Call this on
+  // every real location update; it re-fetches Directions from the driver's current position
+  // to the same destination, throttled so a ~4s GPS cadence doesn't hammer the Directions API.
+  async function refreshRoute(): Promise<void> {
+    if (!isPlayingRoute.value || isSimulating.value || !activeDestination) return;
+    const now = Date.now();
+    if (now - lastRouteRefreshAt < ROUTE_REFRESH_MIN_INTERVAL_MS) return;
+    lastRouteRefreshAt = now;
+
+    const google = getGoogle();
+    const map = getMap();
+    if (!google || !map) return;
+
+    const path = await fetchDrivingPath(activeDestination);
+    if (!path || !isPlayingRoute.value) return;
+
+    routePolyline?.setMap(null);
+    routePolyline = new google.maps.Polyline({
+      path,
+      map,
+      strokeColor: '#1a73e8',
+      strokeOpacity: 0.85,
+      strokeWeight: 4,
+    });
   }
 
   function startTimer(): void {
@@ -152,6 +184,8 @@ export function useRoutePlayback({
     path.forEach((point: any) => bounds.extend(point));
     map.fitBounds(bounds, 80);
 
+    activeDestination = destination;
+    lastRouteRefreshAt = Date.now();
     isSimulating.value = simulate;
     isPlayingRoute.value = true;
     if (simulate) {
@@ -166,5 +200,5 @@ export function useRoutePlayback({
     clearPreview();
   });
 
-  return { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRoute, resumeRoute, stopRoute };
+  return { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRoute, resumeRoute, stopRoute, refreshRoute };
 }
