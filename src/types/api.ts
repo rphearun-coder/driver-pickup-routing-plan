@@ -46,16 +46,6 @@ export interface WarehouseRecord {
   address: string;
 }
 
-export interface LoginPayload {
-  username: string;
-  password: string;
-}
-
-export interface LoginResponse {
-  accessToken: string;
-  user: AuthenticatedUser;
-}
-
 export interface CreateOrderPayload {
   customerId: number;
   warehouseId: number;

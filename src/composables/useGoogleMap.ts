@@ -5,6 +5,7 @@ import type { LatLng } from '@/types';
 export interface UseGoogleMapOptions {
   center: LatLng;
   zoom: number;
+  disableDefaultUI?: boolean;
 }
 
 export function useGoogleMap(mapEl: Ref<HTMLDivElement | null>, options: UseGoogleMapOptions) {
@@ -16,7 +17,7 @@ export function useGoogleMap(mapEl: Ref<HTMLDivElement | null>, options: UseGoog
     map.value = new google.value.maps.Map(mapEl.value, {
       zoom: options.zoom,
       center: options.center,
-      disableDefaultUI: false,
+      disableDefaultUI: options.disableDefaultUI ?? false,
     });
     return { google: google.value, map: map.value };
   }

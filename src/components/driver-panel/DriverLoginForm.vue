@@ -29,7 +29,7 @@ const emit = defineEmits<{
   login: [payload: { phoneNumber: string; password: string }];
 }>();
 
-const phoneNumber = ref('+85570708595');
+const phoneNumber = ref('+8551531198');
 const password = ref('12345');
 
 function submitLogin(): void {

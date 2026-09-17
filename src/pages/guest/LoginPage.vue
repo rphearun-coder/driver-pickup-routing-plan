@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { login } from '../../api/auth.ts';
+import { loginDriver } from '../../api/auth.ts';
 import { useAuthStore } from '../../stores/auth.ts';
 import { useAuth } from '../../composables/useAuth';
 import PhoneNumberInput from '../../components/PhoneNumberInput.vue';
 import BrandLogo from '../../components/BrandLogo.vue';
 
-const phone = ref('+85570708595');
+const phone = ref('+8551531198');
 const password = ref('12345');
 const showPassword = ref(false);
 const error = ref('');
@@ -21,16 +21,24 @@ async function onSubmit() {
   error.value = '';
   loading.value = true;
   try {
-    const { accessToken, user } = await login({ username: phone.value, password: password.value });
-    auth.setToken(accessToken);
-    auth.setUser({ ...user, roles: [user.userType] });
+    const { user, token } = await loginDriver(phone.value, password.value);
+    auth.setToken(token);
+    auth.setUser({
+      id: user.id,
+      username: user.username ?? '',
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      userType: user.userType ?? 'DRIVER',
+      status: user.status ?? 'ACTIVE',
+      roles: [user.userType ?? 'DRIVER'],
+    });
     // Bridges this session into useAuth()'s driverToken/driverUser too, so the
     // Home page's online toggle and the live map's DriverPanel work off the
     // same login instead of needing a second, separate DriverPanel sign-in.
-    await setSession(accessToken, { id: user.id, username: user.username, fullName: user.fullName });
+    await setSession(token, { id: user.id, username: user.username, fullName: user.fullName });
     router.push({ name: 'splash' });
   } catch (err: any) {
-    error.value = err.response?.data?.message ?? 'Login failed';
+    error.value = err?.message ?? 'Login failed';
   } finally {
     loading.value = false;
   }

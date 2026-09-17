@@ -10,7 +10,8 @@ import { useGoogleMap } from '@/composables/useGoogleMap';
 import { useLocationMode, type LocationMode } from '@/composables/useLocationMode';
 
 const router = useRouter();
-const { platform, browserName, permissionState, checking, reading, checkError, checkNow } = useDeviceGps();
+const { platform, browserName, permissionState, checking, reading, checkError, checkNow, refreshPermissionState } =
+  useDeviceGps();
 const { locationError } = useDriverLocationPublishing();
 const { locationMode, setLocationMode } = useLocationMode();
 const { driverUser } = useAuth();
@@ -35,7 +36,11 @@ watch(reading, async (value) => {
 });
 
 const mapEl = ref<HTMLDivElement | null>(null);
-const { google, map, init: initMap } = useGoogleMap(mapEl, { center: { lat: 0, lng: 0 }, zoom: 16 });
+const { google, map, init: initMap } = useGoogleMap(mapEl, {
+  center: { lat: 0, lng: 0 },
+  zoom: 16,
+  disableDefaultUI: true,
+});
 let marker: any = null;
 let accuracyCircle: any = null;
 let mapReady = false;
@@ -84,26 +89,42 @@ const permissionLabel = computed(() => {
   }
 });
 
+// What's actually broken right now, listed out plainly instead of making the driver
+// infer it from a badge color alone.
+const activeIssues = computed<string[]>(() => {
+  const issues: string[] = [];
+  if (permissionState.value === 'denied') issues.push('Location permission is blocked for this site.');
+  if (permissionState.value === 'unsupported') issues.push("This browser doesn't support location services.");
+  if (checkError.value) issues.push(checkError.value);
+  if (locationError.value) issues.push(`Live tracking: ${locationError.value}`);
+  return issues;
+});
+
+const needsRepair = computed(() => activeIssues.value.length > 0);
+
 const helpSteps = computed<string[]>(() => {
+  if (permissionState.value === 'unsupported') {
+    return [`Try a different browser — Chrome or Safari have the most reliable location support.`];
+  }
   if (platform === 'iOS') {
     return [
       `Open iPhone Settings → Privacy & Security → Location Services, and make sure Location Services is on.`,
       `Scroll down to ${browserName}, tap it, and set access to "While Using the App".`,
-      `Return here and tap "Check GPS now" again.`,
     ];
   }
   if (platform === 'Android') {
     return [
       `Open Android Settings → Apps → ${browserName} → Permissions → Location, and set it to Allow.`,
       `If location is off system-wide, also enable it from the quick settings shade or Settings → Location.`,
-      `Return here and tap "Check GPS now" again.`,
     ];
   }
-  return [
-    `Click the lock/info icon in the address bar and set Location to "Allow" for this site.`,
-    `Return here and tap "Check GPS now" again.`,
-  ];
+  return [`Click the lock/info icon in the address bar and set Location to "Allow" for this site.`];
 });
+
+async function repairNow(): Promise<void> {
+  await refreshPermissionState();
+  checkNow();
+}
 
 function formatCoord(value: number): string {
   return value.toFixed(6);
@@ -164,11 +185,23 @@ function onModeChange(mode: LocationMode): void {
         </div>
       </section>
 
-      <section v-if="permissionState !== 'granted'" class="card">
-        <h2>How to enable location on {{ platform }}</h2>
-        <ol class="help-steps">
-          <li v-for="(step, index) in helpSteps" :key="index">{{ step }}</li>
-        </ol>
+      <section v-if="needsRepair" class="card repair-card">
+        <h2 class="repair-heading">Location isn't working</h2>
+
+        <ul class="issue-list">
+          <li v-for="(issue, index) in activeIssues" :key="index">{{ issue }}</li>
+        </ul>
+
+        <template v-if="helpSteps.length">
+          <p class="repair-subheading">How to fix it on {{ platform }}</p>
+          <ol class="help-steps">
+            <li v-for="(step, index) in helpSteps" :key="index">{{ step }}</li>
+          </ol>
+        </template>
+
+        <button type="button" class="check-btn repair-btn" :disabled="checking" @click="repairNow">
+          {{ checking ? 'Checking…' : "I fixed it — check again" }}
+        </button>
       </section>
     </main>
   </div>
@@ -337,5 +370,32 @@ function onModeChange(mode: LocationMode): void {
   color: var(--ink);
   font-size: 0.85rem;
   line-height: 1.4;
+}
+.repair-card {
+  border-color: #e0433b;
+  background: #fff6f5;
+}
+.repair-card .repair-heading {
+  color: #e0433b;
+}
+.issue-list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #b8342c;
+  font: 600 0.85rem var(--sans);
+  line-height: 1.4;
+}
+.repair-subheading {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font: 700 0.78rem var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.repair-btn {
+  margin-top: 14px;
 }
 </style>

@@ -48,6 +48,9 @@ export interface AuthUser {
   id: string;
   username?: string;
   fullName?: string;
+  phoneNumber?: string;
+  userType?: string;
+  status?: string;
 }
 
 export interface BankAccount {
