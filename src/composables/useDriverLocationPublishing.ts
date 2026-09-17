@@ -103,11 +103,16 @@ function startWatching(): void {
   const geoOptions: PositionOptions = {
     enableHighAccuracy: document.visibilityState !== 'hidden',
     maximumAge: document.visibilityState === 'hidden' ? BACKGROUND_INTERVAL_MS : 1000,
-    timeout: 10000,
+    timeout: 20000,
   };
   const handleLocationError = (error: GeolocationPositionError) => {
     console.warn('Unable to read driver location:', error.message);
-    locationError.value = error.message || 'Unable to read your location.';
+    // watchPosition runs continuously alongside this poll's own getCurrentPosition calls —
+    // a slow/timed-out poll doesn't mean location has actually stopped working if watchPosition
+    // delivered a fix recently. Only surface the error once there's truly been no fix in a while,
+    // instead of flashing "Timeout expired" over an otherwise-healthy live feed.
+    const recentFix = lastPublishedPosition && Date.now() - lastPublishedPosition.publishedAt < geoOptions.timeout!;
+    if (!recentFix) locationError.value = error.message || 'Unable to read your location.';
   };
 
   watchId = navigator.geolocation.watchPosition(publishPosition, handleLocationError, geoOptions);

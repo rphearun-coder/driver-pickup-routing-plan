@@ -20,6 +20,23 @@ export function useDeviceGps() {
     permissionState.value = await queryGeoPermission();
   }
 
+  function onFix(position: GeolocationPosition): void {
+    checking.value = false;
+    permissionState.value = 'granted';
+    reading.value = {
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+      accuracyMeters: position.coords.accuracy,
+      at: position.timestamp,
+    };
+  }
+
+  function onError(error: GeolocationPositionError): void {
+    checking.value = false;
+    checkError.value = error.message || 'Unable to read your location.';
+    if (error.code === error.PERMISSION_DENIED) permissionState.value = 'denied';
+  }
+
   // getCurrentPosition (not the Permissions API) is the real source of truth for whether
   // location actually works right now — iOS Safari's Permissions API support is spotty,
   // and this also doubles as a live GPS fix test the driver can trigger on demand.
@@ -32,22 +49,19 @@ export function useDeviceGps() {
     checking.value = true;
     checkError.value = '';
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        checking.value = false;
-        permissionState.value = 'granted';
-        reading.value = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-          accuracyMeters: position.coords.accuracy,
-          at: position.timestamp,
-        };
-      },
+      onFix,
       (error) => {
-        checking.value = false;
-        checkError.value = error.message || 'Unable to read your location.';
-        if (error.code === error.PERMISSION_DENIED) permissionState.value = 'denied';
+        // A high-accuracy GPS fix can time out indoors/on desktops with only Wi-Fi-based
+        // positioning available. Retry once at low accuracy before surfacing an error —
+        // that's typically faster to resolve and still good enough for this check.
+        if (error.code !== error.TIMEOUT) return onError(error);
+        navigator.geolocation.getCurrentPosition(onFix, onError, {
+          enableHighAccuracy: false,
+          timeout: 20000,
+          maximumAge: 0,
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   }
 
