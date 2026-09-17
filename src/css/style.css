@@ -22,6 +22,7 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  height: 100dvh; /* iOS Safari's 100vh is the address-bar-collapsed height, not what's actually visible */
   width: 100%;
   overflow: hidden;
 }
@@ -31,6 +32,7 @@ body {
   font-family: 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
   display: flex;
   align-items: center;
@@ -43,12 +45,27 @@ body {
   height: 956px;
   max-width: 100vw;
   max-height: 100vh;
+  max-height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   background: #f3eee8;
   contain: layout;
+}
+
+/* Removes the ~300ms tap delay and disables double-tap-to-zoom on controls —
+   default browser behavior on both iOS and Android otherwise treats every tap
+   as a possible start of a double-tap, making buttons feel sluggish. */
+a,
+button,
+input,
+select,
+textarea,
+[role='button'] {
+  touch-action: manipulation;
 }
 
 .home-link {

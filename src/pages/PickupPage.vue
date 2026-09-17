@@ -634,7 +634,7 @@ onMounted(loadPickups);
   border-radius: 14px;
   background: #fff;
   color: var(--ink);
-  font: 500 0.88rem var(--sans);
+  font: 500 16px var(--sans); /* iOS Safari auto-zooms on focus if an input's font-size is under 16px */
 }
 .order-search-input::placeholder {
   color: var(--muted);

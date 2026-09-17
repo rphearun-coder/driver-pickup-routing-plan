@@ -118,7 +118,7 @@ onUnmounted(() => {
   border-radius: 12px;
   background: #fff;
   color: var(--ink);
-  font: 500 0.9rem var(--sans);
+  font: 500 16px var(--sans); /* iOS Safari auto-zooms on focus if an input's font-size is under 16px */
 }
 .text-input::placeholder {
   color: var(--muted);

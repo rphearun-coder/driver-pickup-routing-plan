@@ -97,7 +97,7 @@ function emitValue(): void {
   border: none;
   outline: none;
   padding: 14px 0;
-  font: 500 0.9rem var(--sans);
+  font: 500 16px var(--sans); /* iOS Safari auto-zooms on focus if an input's font-size is under 16px */
   color: var(--ink);
   background: transparent;
 }
