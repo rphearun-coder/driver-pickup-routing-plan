@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   readonly VITE_USER_SERVICE_URL: string;
   readonly VITE_LOCATION_SERVICE_URL: string;
   readonly VITE_ORDER_SERVICE_URL: string;
+  readonly VITE_PAYMENT_SERVICE_URL: string;
+  readonly VITE_DRIVER_API_BASE_URL: string;
   readonly VITE_DEV_BYPASS_AUTH?: string;
 }
 

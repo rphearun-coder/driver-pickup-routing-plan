@@ -80,16 +80,6 @@ function toPickupPoint(item: OrderApiItem, index: number): PickupPoint | null {
   };
 }
 
-export function filterSharedOrder(
-  pickup: PickupPoint,
-  orderId?: string,
-  onRoute?: boolean,
-): PickupPoint | null {
-  if (orderId && pickup.id !== orderId) return null;
-  if (onRoute !== undefined && pickup.onRoute !== onRoute) return null;
-  return pickup;
-}
-
 // dateStr is a local calendar date ("YYYY-MM-DD"); the range covers that whole local day.
 function dayRange(dateStr: string): { startAt: string; endAt: string } {
   return {

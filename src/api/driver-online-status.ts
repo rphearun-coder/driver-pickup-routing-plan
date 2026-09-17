@@ -2,20 +2,31 @@ import { gqlRequest } from './graphql';
 import { LOCATION_SERVICE_URL } from '../config';
 import type { OnlineStatus } from '../types';
 
+export interface OnlineStatusResult {
+  status: OnlineStatus;
+  updatedAt: string;
+}
+
 const GET_ONLINE_STATUS_QUERY = `
   query GetOnlineStatus {
-    getOnlineStatus
+    getOnlineStatus {
+      status
+      updatedAt
+    }
   }
 `;
 
 const TOGGLE_ONLINE_STATUS_MUTATION = `
   mutation ToggleOnlineStatus {
-    toggleOnlineStatus
+    toggleOnlineStatus {
+      status
+      updatedAt
+    }
   }
 `;
 
-export async function getOnlineStatus(driverToken: string): Promise<OnlineStatus> {
-  const data = await gqlRequest<{ getOnlineStatus: OnlineStatus }>(
+export async function getOnlineStatus(driverToken: string): Promise<OnlineStatusResult> {
+  const data = await gqlRequest<{ getOnlineStatus: OnlineStatusResult }>(
     LOCATION_SERVICE_URL,
     GET_ONLINE_STATUS_QUERY,
     undefined,
@@ -24,8 +35,8 @@ export async function getOnlineStatus(driverToken: string): Promise<OnlineStatus
   return data.getOnlineStatus;
 }
 
-export async function toggleOnlineStatus(driverToken: string): Promise<OnlineStatus> {
-  const data = await gqlRequest<{ toggleOnlineStatus: OnlineStatus }>(
+export async function toggleOnlineStatus(driverToken: string): Promise<OnlineStatusResult> {
+  const data = await gqlRequest<{ toggleOnlineStatus: OnlineStatusResult }>(
     LOCATION_SERVICE_URL,
     TOGGLE_ONLINE_STATUS_MUTATION,
     undefined,

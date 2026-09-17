@@ -91,10 +91,14 @@ function validCoordinate(value: number | string, min: number, max: number): numb
   return Number.isFinite(coordinate) && coordinate >= min && coordinate <= max ? coordinate : null;
 }
 
+// Defaults match Jalat-Location-Service's DriverShiftEnum.PICKUP / ShiftMapEnum.MORNING —
+// the only driverShift value the Order Service's getDriverLocation lookups ever query for
+// (see getOrderListByUser and driver-daily-activity.service.ts, both hardcode 'PICKUP').
+// A location published under any other driverShift is invisible to those lookups.
 export function publishDriverLocation(
   client: MqttClient | undefined | null,
   driverId: string,
-  { lat, lon, driverShift = 2, shiftType = 1 }: PublishDriverLocationOptions
+  { lat, lon, driverShift = 1, shiftType = 1 }: PublishDriverLocationOptions
 ): void {
   if (!client || client.disconnecting) return;
   const latitude = validCoordinate(lat, -90, 90);

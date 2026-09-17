@@ -98,6 +98,23 @@ export function useAuth() {
     writeStored(DRIVER_STORAGE_KEY, null);
   }
 
+  // Bridges the main app login (Pinia's useAuthStore, driven by LoginPage's
+  // adminLogin call) into this driver-token/driverUser pair, so features built
+  // against useAuth() — useDriverPresence's online toggle, the DriverPanel —
+  // work off the same session instead of requiring a second, separate
+  // DriverPanel login for the same person.
+  async function setSession(token: string, user: AuthUser): Promise<void> {
+    driverLoginError.value = '';
+    driverToken.value = token;
+    driverUser.value = user;
+    writeStored(DRIVER_STORAGE_KEY, { token, user });
+    try {
+      driverProfile.value = await getProfile(token);
+    } catch {
+      // profile is a nice-to-have — a fetch failure here shouldn't fail the bridge.
+    }
+  }
+
   return {
     driverToken,
     driverUser,
@@ -106,5 +123,6 @@ export function useAuth() {
     driverLoggingIn,
     loginAsDriver,
     logoutDriver,
+    setSession,
   };
 }

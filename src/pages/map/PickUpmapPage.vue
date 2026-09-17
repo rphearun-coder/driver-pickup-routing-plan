@@ -1,4 +1,11 @@
 <template>
+  <RouterLink :to="{ name: 'home' }" class="home-link" aria-label="Back to home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5.5 10v9a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1v-9" />
+    </svg>
+  </RouterLink>
+
   <LocationModeSwitch :model-value="locationMode" @update:model-value="setMode" />
 
   <DriverMap
@@ -32,7 +39,7 @@
     :active-pickup-id="resumedPickupId"
     :location-error="locationError"
     @login="handleLogin"
-    @logout="logoutDriver"
+    @logout="handleLogout"
     @invite="handleInvite"
     @toggle-online="handleToggleOnline"
     @refresh="handleRefresh"
@@ -58,15 +65,18 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import { useAuth } from "@/composables/useAuth";
 import { useDriverLocations } from "@/composables/useDriverLocations";
 import { useDriverLocationPublishing } from "@/composables/useDriverLocationPublishing";
 import { useDriverPresence } from "@/composables/useDriverPresence";
+import { useLocationMode } from "@/composables/useLocationMode";
 import { useRoutePlayback } from "@/composables/useRoutePlayback";
 import DriverMap from "@/components/map/DriverMap.vue";
 import DriverPanel from "@/components/driver-panel/DriverPanel.vue";
 import LocationModeSwitch from "@/components/LocationModeSwitch.vue";
-import { APP_MODE, PICKUP_POLL_INTERVAL_MS } from "@/config";
+import { PICKUP_POLL_INTERVAL_MS } from "@/config";
 import { fetchDriverOrders, updateOrderOnRoute } from "@/api/orders";
 import { todayIso } from "@/utils/date";
 import type { LatLng, PickupPoint, PickupTimeSlot } from "@/types";
@@ -88,17 +98,13 @@ let pickupPollTimer: ReturnType<typeof setInterval> | null = null;
 let pickupAbortController: AbortController | null = null;
 
 const { driverToken, driverUser, driverProfile, driverLoginError, driverLoggingIn, loginAsDriver, logoutDriver } = useAuth();
+const router = useRouter();
+const authStore = useAuthStore();
 const activeDriverId = ref("");
 watch(driverUser, (user) => (activeDriverId.value = user?.id || ""), { immediate: true });
 const driverDisplayName = computed(() => driverProfile.value?.fullName ?? driverUser.value?.fullName ?? "");
 
-type LocationMode = "test" | "live";
-const MODE_STORAGE_KEY = "jalat-location-mode";
-const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY);
-const locationMode = ref<LocationMode>(
-  storedMode === "test" || storedMode === "live" ? storedMode : APP_MODE === "production" ? "live" : "test",
-);
-const isLiveMode = computed(() => locationMode.value === "live");
+const { locationMode, isLiveMode, setLocationMode } = useLocationMode();
 
 // Persists an in-progress "drive to pickup" so a page refresh resumes it instead of
 // silently dropping back to the idle pickup list, as if "Stop driving" had been pressed.
@@ -134,11 +140,10 @@ const { connectionStatus, driverLocations, locationVersion, publishOwnLocation, 
   currentDriverId: activeDriverId,
 });
 
-function setMode(mode: LocationMode): void {
+function setMode(mode: "test" | "live"): void {
   if (locationMode.value === mode) return;
   if (isPlayingRoute.value) stopRoute();
-  locationMode.value = mode;
-  window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+  setLocationMode(mode);
 }
 
 function myPosition(): LatLng {
@@ -151,18 +156,12 @@ function myPosition(): LatLng {
 // started arriving, so it can stop saying "waiting for the driver's live position".
 const hasLivePosition = computed(() => driverLocations.has(activeDriverId.value));
 
-const { isOnline, isSyncing: isSyncingPresence, presenceError, toggleOnline } = useDriverPresence({
-  currentDriverId: activeDriverId,
-  driverToken,
-  onOnlineChange: (online) => driverMapRef.value?.setOnline(online),
-});
+const { isOnline, isSyncing: isSyncingPresence, presenceError, toggleOnline } = useDriverPresence();
+watch(isOnline, (online) => driverMapRef.value?.setOnline(online));
 
-const { locationError } = useDriverLocationPublishing({
-  currentDriverId: activeDriverId,
-  isOnline,
-  isLiveMode,
-  publish: publishOwnLocation,
-});
+// The actual publishing runs app-wide from App.vue (see useDriverLocationPublishing.ts) —
+// this just reads the shared locationError so the panel can still surface it here.
+const { locationError } = useDriverLocationPublishing();
 
 async function refreshPickups(): Promise<void> {
   if (!driverToken.value) return;
@@ -186,6 +185,16 @@ onBeforeUnmount(() => stopPickupPolling());
 
 async function handleLogin(payload: { phoneNumber: string; password: string }): Promise<void> {
   await loginAsDriver(payload.phoneNumber, payload.password);
+}
+
+// "Log out" here must end the whole app session (matches ProfilePage's logout),
+// not just this page's local useAuth() driver session — otherwise the user stays
+// authenticated everywhere else while this panel drops them into a confusing
+// re-login form.
+function handleLogout(): void {
+  authStore.logout();
+  logoutDriver();
+  router.push({ name: "login" });
 }
 
 watch([isOnline, driverToken], ([online, token]) => {
@@ -293,7 +302,7 @@ function handleDevPublish({ lat, lon }: { driverId: string; lat: number; lon: nu
 
 async function handleInvite(pickup?: PickupPoint): Promise<void> {
   if (!activeDriverId.value) return;
-  const trackingUrl = new URL(`/track/${encodeURIComponent(activeDriverId.value)}`, window.location.origin);
+  const trackingUrl = new URL(`/pickup-map/${encodeURIComponent(activeDriverId.value)}`, window.location.origin);
   if (pickup?.id) {
     trackingUrl.searchParams.set("orderId", pickup.id);
     trackingUrl.searchParams.set("onRoute", String(Boolean(pickup.onRoute)));

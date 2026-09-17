@@ -16,7 +16,6 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import DriverMap from "@/components/map/DriverMap.vue";
 import { useDriverLocations } from "@/composables/useDriverLocations";
-import { filterSharedOrder } from "@/api/orders";
 import type { LatLng, PickupPoint } from "@/types";
 
 const DEFAULT_CENTER: LatLng = { lat: 11.525480965356625, lng: 104.90954542274423 };
@@ -30,18 +29,16 @@ const pickupMarker = computed<PickupPoint | null>(() => {
   const lon = Number(route.query.pickupLon);
   if (!orderId || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const onRoute = route.query.onRoute === "true";
-  return filterSharedOrder({
+  return {
     id: orderId,
     path: [{ lat, lng: lon }],
     label: typeof route.query.pickupLabel === "string" ? route.query.pickupLabel : "Pickup",
     status: onRoute ? "ON_ROUTE" : "IN_PROGRESS",
     onRoute,
-  }, orderId, onRoute);
+  };
 });
 
-const currentDriverId = ref(driverId.value);
-watch(driverId, (id) => (currentDriverId.value = id), { immediate: true });
-const { driverLocations, locationVersion } = useDriverLocations({ currentDriverId });
+const { driverLocations, locationVersion } = useDriverLocations({ currentDriverId: driverId });
 
 let routePolyline: any = null;
 let lastRouteKey = ''; // `${orderId}:${driverId}` — forces an immediate redraw when the pickup/driver changes
