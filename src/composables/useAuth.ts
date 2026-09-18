@@ -2,6 +2,8 @@ import { ref } from 'vue';
 import { getProfile, loginDriver } from '@/api/auth';
 import { setUnauthorizedHandler } from '@/api/graphql';
 import { DEV_BYPASS_AUTH } from '@/config';
+import router from '@/router';
+import { useAuthStore } from '@/stores/auth';
 import type { AuthUser, UserProfile } from '@/types';
 
 const DRIVER_STORAGE_KEY = 'driver-id-map-app:driverAuth';
@@ -48,12 +50,22 @@ const driverProfile = ref<UserProfile | null>(null);
 const driverLoginError = ref<string>('');
 const driverLoggingIn = ref(false);
 
+// Was only clearing the driver-token half of the session and leaving the
+// driver stranded on whatever page they were on — useAuthStore's accessToken
+// stayed valid-looking, so the router's requiresAuth guard never kicked them
+// back to /login. Now mirrors lib/graphql-request.ts's auth-error handling:
+// clear both halves of the session and actually redirect.
 function forceLogout(): void {
   driverToken.value = '';
   driverUser.value = null;
   driverProfile.value = null;
   writeStored(DRIVER_STORAGE_KEY, null);
   driverLoginError.value = 'Your session expired. Please log in again.';
+
+  useAuthStore().logout();
+  if (router.currentRoute.value.name !== 'login') {
+    router.push({ name: 'login' });
+  }
 }
 
 setUnauthorizedHandler(forceLogout);
@@ -99,7 +111,7 @@ export function useAuth() {
   }
 
   // Bridges the main app login (Pinia's useAuthStore, driven by LoginPage's
-  // adminLogin call) into this driver-token/driverUser pair, so features built
+  // loginDriver call) into this driver-token/driverUser pair, so features built
   // against useAuth() — useDriverPresence's online toggle, the DriverPanel —
   // work off the same session instead of requiring a second, separate
   // DriverPanel login for the same person.

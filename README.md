@@ -59,6 +59,11 @@ npm run preview
 - [ ] Add automated tests for coordinate validation and publish throttling
 - [x] Confirm the Location Service consumes the latest driver location from `/topic/driver/{driverId}/location`
 - [x] Add a Device & GPS page for checking/re-requesting location permission across iPhone/Android/desktop
+- [ ] Nearby-driver matching: query drivers within radius of a pickup point (geospatial/Distance Matrix) for order assignment
+- [ ] Realtime order-assignment push: notify a driver over MQTT the moment an order is assigned to them
+- [ ] Reconnect/backoff handling for the MQTT client on dropped WebSocket connections
+- [ ] Driver shift history log (online/offline timestamps, total distance/time per shift)
+- [ ] Stale-location detection: flag/hide a driver marker if no location update received within N seconds
 
 ## Notes
 - Use the WebSocket MQTT URL, not the raw TCP port, from the browser.

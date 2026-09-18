@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import DetailInfoCard from '../components/DetailInfoCard.vue';
+import InfoRow from '../components/InfoRow.vue';
+import PhotoUploadCard from '../components/PhotoUploadCard.vue';
 import {
   confirmReturnParcel,
   confirmReturnParcelToWarehouse,
@@ -48,12 +51,10 @@ const CONFIRM_ACTIONS: Partial<Record<string, { kind: ConfirmKind; label: string
 const confirmAction = computed(() => (parcel.value ? CONFIRM_ACTIONS[parcel.value.status] : undefined));
 const canConfirm = computed(() => !!confirmAction.value && !!proofFile.value && !confirming.value);
 
-function onProofFileChange(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const picked = input.files?.[0] ?? null;
-  proofFile.value = picked;
+function onProofFileChange(file: File): void {
+  proofFile.value = file;
   if (proofPreviewUrl.value) URL.revokeObjectURL(proofPreviewUrl.value);
-  proofPreviewUrl.value = picked ? URL.createObjectURL(picked) : '';
+  proofPreviewUrl.value = URL.createObjectURL(file);
 }
 
 async function onConfirm(): Promise<void> {
@@ -131,50 +132,22 @@ const imageUrl = computed(() => resolveParcelImageUrl(parcel.value?.parcelImage 
     </div>
 
     <div v-else class="detail-body">
-      <div class="shop-card">
-        <div class="shop-thumb">
-          <img v-if="imageUrl" :src="imageUrl" alt="" />
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="3" width="16" height="18" rx="2" /><rect x="7" y="6" width="6" height="6" rx="1" /><path d="M7 15h4M7 18h7" />
-          </svg>
-        </div>
-        <div class="shop-info">
-          <p class="shop-name">{{ parcel.recipientName || parcel.partnerStoreName || parcel.location || 'Unknown' }}</p>
-          <p class="shop-address">{{ parcel.deliveryAddress || parcel.location || '—' }}</p>
-        </div>
-        <span class="status-badge" :style="{ background: statusColor }">{{ parcel.status }}</span>
-      </div>
+      <DetailInfoCard
+        :image-url="imageUrl"
+        :name="parcel.recipientName || parcel.partnerStoreName || parcel.location || 'Unknown'"
+        :address="parcel.deliveryAddress || parcel.location || ''"
+        :status="parcel.status"
+        :status-color="statusColor"
+      />
 
       <div class="info-list">
-        <div class="info-row">
-          <span>Recipient</span>
-          <a v-if="parcel.recipientNumber" :href="`tel:${parcel.recipientNumber}`">{{ parcel.recipientNumber }}</a>
-          <strong v-else>—</strong>
-        </div>
-        <div class="info-row">
-          <span>Order ID</span>
-          <strong>{{ parcel.orderId }}</strong>
-        </div>
-        <div class="info-row">
-          <span>Shop</span>
-          <strong>{{ parcel.partnerStoreName || '—' }}</strong>
-        </div>
-        <div class="info-row">
-          <span>Delivery address</span>
-          <strong>{{ parcel.deliveryAddress || '—' }}</strong>
-        </div>
-        <div class="info-row">
-          <span>COD amount</span>
-          <strong>{{ formatUSD(parcel.codUsd || parcel.price) }}</strong>
-        </div>
-        <div class="info-row">
-          <span>Created</span>
-          <strong>{{ formatDateTime(parcel.createdAt) }}</strong>
-        </div>
-        <div class="info-row">
-          <span>Updated</span>
-          <strong>{{ formatDateTime(parcel.updatedAt) }}</strong>
-        </div>
+        <InfoRow label="Recipient" :value="parcel.recipientNumber" :href="parcel.recipientNumber ? `tel:${parcel.recipientNumber}` : undefined" />
+        <InfoRow label="Order ID" :value="parcel.orderId" />
+        <InfoRow label="Shop" :value="parcel.partnerStoreName" />
+        <InfoRow label="Delivery address" :value="parcel.deliveryAddress" />
+        <InfoRow label="COD amount" :value="formatUSD(parcel.codUsd || parcel.price)" />
+        <InfoRow label="Created" :value="formatDateTime(parcel.createdAt)" />
+        <InfoRow label="Updated" :value="formatDateTime(parcel.updatedAt)" />
       </div>
 
       <div class="detail-actions">
@@ -199,16 +172,7 @@ const imageUrl = computed(() => resolveParcelImageUrl(parcel.value?.parcelImage 
 
       <div v-if="confirmAction" class="confirm-section">
         <p class="section-label">{{ confirmAction.hint }}</p>
-        <label class="upload-box">
-          <input type="file" accept="image/*" capture="environment" hidden @change="onProofFileChange" />
-          <img v-if="proofPreviewUrl" :src="proofPreviewUrl" alt="Proof preview" class="preview-img" />
-          <template v-else>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 16V4M12 4l-4 4M12 4l4 4" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
-            </svg>
-            <span>Upload photo</span>
-          </template>
-        </label>
+        <PhotoUploadCard :preview-url="proofPreviewUrl" @change="onProofFileChange" />
 
         <p v-if="confirmError" class="error-text">{{ confirmError }}</p>
 
@@ -270,89 +234,10 @@ const imageUrl = computed(() => resolveParcelImageUrl(parcel.value?.parcelImage 
 .detail-body {
   padding: 32px 16px 40px;
 }
-.shop-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--wash);
-  margin-bottom: 16px;
-}
-.shop-thumb {
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  color: var(--muted);
-}
-.shop-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.shop-thumb svg {
-  width: 26px;
-  height: 26px;
-}
-.shop-info {
-  flex: 1;
-  min-width: 0;
-}
-.shop-name {
-  margin: 0 0 2px;
-  font: 700 0.95rem var(--sans);
-  color: var(--ink);
-}
-.shop-address {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.status-badge {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #fff;
-  font: 700 0.65rem var(--sans);
-  letter-spacing: 0.02em;
-}
 .info-list {
   border-radius: 16px;
   border: 1px solid var(--line);
   overflow: hidden;
-}
-.info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  font-size: 0.85rem;
-}
-.info-row + .info-row {
-  border-top: 1px solid var(--line);
-}
-.info-row span {
-  color: var(--muted);
-}
-.info-row strong,
-.info-row a {
-  color: var(--ink);
-  font-weight: 700;
-  text-align: right;
-}
-.info-row a {
-  color: var(--green);
-  text-decoration: none;
 }
 .detail-actions {
   display: flex;
@@ -398,31 +283,6 @@ const imageUrl = computed(() => resolveParcelImageUrl(parcel.value?.parcelImage 
 }
 .confirm-section {
   margin-top: 20px;
-}
-.upload-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 140px;
-  padding: 20px;
-  border: 1px dashed var(--line);
-  border-radius: 16px;
-  color: var(--muted);
-  font: 500 0.82rem var(--sans);
-  cursor: pointer;
-  overflow: hidden;
-}
-.upload-box svg {
-  width: 26px;
-  height: 26px;
-}
-.preview-img {
-  max-width: 100%;
-  max-height: 180px;
-  border-radius: 10px;
-  object-fit: contain;
 }
 .error-text {
   margin-top: 12px;

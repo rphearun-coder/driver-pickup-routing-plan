@@ -4,9 +4,10 @@ import { useRouter } from 'vue-router';
 import BrandLogo from '../components/BrandLogo.vue';
 import RangePicker from '../components/RangePicker.vue';
 import { getOrderListByUser, updateOnRoute } from '../api/pickup-orders';
+import { resolveParcelImageUrl } from '../api/parcels';
 import { DATE_RANGE_OPTIONS, todayRange, type DateRangeKey } from '../api/dashboard';
 import { useOrderDetailStore } from '../stores/orderDetail';
-import type { PickupOrderItem, PickupOrderListResult } from '../types/api';
+import type { PickupOrderItem, PickupOrderListResult, PickupOrderStatus } from '../types/api';
 
 const router = useRouter();
 const orderDetail = useOrderDetailStore();
@@ -55,14 +56,35 @@ const summary = computed(() => {
   };
 });
 
+// The backend's pre-formatted text runs the number straight into the unit
+// ("4.8km", "10min") — insert the space back in regardless of source so
+// distance/time always reads consistently.
+function withUnitSpacing(text: string): string {
+  return text.replace(/(\d)([a-zA-Z])/g, '$1 $2');
+}
+
 // Prefers the backend's own pre-formatted text; falls back to computing from
 // the raw meters/seconds when that text isn't populated, instead of silently
 // showing a fake "0.0 km | 0 min" placeholder.
 function formatDistance(meters?: number, seconds?: number, metersText?: string, secondsText?: string): string {
-  if (metersText && secondsText) return `${metersText} | ${secondsText}`;
+  if (metersText && secondsText) return withUnitSpacing(`${metersText} | ${secondsText}`);
   const km = (meters ?? 0) / 1000;
   const min = Math.round((seconds ?? 0) / 60);
   return `${km.toFixed(1)} km | ${min} min`;
+}
+
+interface DistanceParts {
+  distanceText: string;
+  durationText: string;
+}
+
+function formatDistanceParts(meters?: number, seconds?: number, metersText?: string, secondsText?: string): DistanceParts {
+  if (metersText && secondsText) {
+    return { distanceText: withUnitSpacing(metersText), durationText: withUnitSpacing(secondsText) };
+  }
+  const km = (meters ?? 0) / 1000;
+  const min = Math.round((seconds ?? 0) / 60);
+  return { distanceText: `${km.toFixed(1)} km`, durationText: `${min} min` };
 }
 
 const routeSummaryText = computed(() => {
@@ -83,8 +105,37 @@ function stopPhone(item: PickupOrderItem): string {
   return item.partner?.phoneNumber || '';
 }
 
-function stopDistance(item: PickupOrderItem): string {
-  return formatDistance(
+function stopAvatarUrl(item: PickupOrderItem): string {
+  return resolveParcelImageUrl(item.partner?.shop?.shopImage);
+}
+
+const STATUS_LABELS: Record<PickupOrderStatus, string> = {
+  PENDING: 'Pending',
+  IN_PROGRESS: 'In Progress',
+  ON_ROUTE: 'On Route',
+  PICKED_UP: 'Picked Up',
+  ABORT_PICK_UP: 'Aborted',
+  CANCELLED: 'Cancelled',
+  DELETED: 'Deleted',
+  REGISTERED: 'Registered',
+  PRINTED: 'Printed',
+};
+
+function statusLabel(item: PickupOrderItem): string {
+  return STATUS_LABELS[item.status] ?? item.status;
+}
+
+function statusClass(item: PickupOrderItem): string {
+  return item.status.toLowerCase().replace(/_/g, '-');
+}
+
+function pickupTimeText(item: PickupOrderItem): string {
+  if (!item.pickupAt) return '';
+  return new Date(item.pickupAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function stopDistanceParts(item: PickupOrderItem): DistanceParts {
+  return formatDistanceParts(
     item.estimatedDistanceMeters,
     item.estimatedDurationSeconds,
     item.estimatedDistanceMetersText,
@@ -201,21 +252,53 @@ onMounted(loadPickups);
           <div class="stop-badge">{{ index + 1 }}</div>
           <div class="stop-body">
             <div class="stop-top">
+              <div class="stop-avatar">
+                <img v-if="stopAvatarUrl(stop)" :src="stopAvatarUrl(stop)" alt="" />
+                <span v-else class="stop-avatar-fallback">{{ stopName(stop).charAt(0) }}</span>
+              </div>
               <div class="stop-identity" role="button" tabindex="0" @click="viewDetail(stop)" @keydown.enter="viewDetail(stop)">
                 <p class="stop-name">{{ stopName(stop) }}</p>
                 <p class="stop-phone">{{ stopPhone(stop) }}</p>
+                <p v-if="pickupTimeText(stop)" class="stop-pickup-time">Pickup {{ pickupTimeText(stop) }}</p>
               </div>
-              <a href="#" class="chat-pill" @click.prevent>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.3-3.9a8.4 8.4 0 0 1-1.2-4.4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z" />
-                </svg>
-                <span>Chat with Shop</span>
-              </a>
+              <div class="stop-top-right">
+                <a href="#" class="chat-pill" @click.prevent>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.3-3.9a8.4 8.4 0 0 1-1.2-4.4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z" />
+                  </svg>
+                  <span>Chat with Shop</span>
+                </a>
+                <span class="status-badge" :class="statusClass(stop)">{{ statusLabel(stop) }}</span>
+              </div>
             </div>
 
             <div class="stop-meta">
-              <span class="distance-pill">{{ stopDistance(stop) }}</span>
-              <span class="parcel-count">Parcels: {{ stop.estimatedTotalParcel ?? 0 }}</span>
+              <div class="distance-row">
+                <span class="distance-pill">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.5" />
+                  </svg>
+                  {{ stopDistanceParts(stop).distanceText }}
+                  <span class="pill-sep"></span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" />
+                  </svg>
+                  {{ stopDistanceParts(stop).durationText }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="view-details-row"
+                @click="viewDetail(stop)"
+              >
+                <span class="parcel-count">Parcels: {{ stop.estimatedTotalParcel ?? 0 }}</span>
+                <span class="view-details-link">
+                  View details
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </span>
+              </button>
             </div>
 
             <div class="stop-actions">
@@ -237,7 +320,7 @@ onMounted(loadPickups);
               </a>
               <button type="button" class="action-item depart-item" :class="{ on: stop.onRoute }" @click="toggleDeparted(stop)">
                 <span class="action-icon depart" :class="{ on: stop.onRoute }">{{ stop.onRoute ? 'ON' : 'OFF' }}</span>
-                <span>{{ stop.onRoute ? 'Departed' : 'Depart' }}</span>
+                <span>{{ stop.onRoute ? 'Departed' : 'On Route' }}</span>
               </button>
             </div>
           </div>
@@ -399,22 +482,22 @@ onMounted(loadPickups);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 .stop-card {
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 /* Connects this stop's badge to the next one's, spanning through the list's
    gap regardless of how tall this card's body ends up (variable content). */
 .stop-card:not(:last-child)::before {
   content: '';
   position: absolute;
-  left: 13px;
-  top: 26px;
-  bottom: -16px;
+  left: 11px;
+  top: 22px;
+  bottom: -12px;
   width: 0;
   border-left: 2px dashed var(--green);
 }
@@ -423,93 +506,210 @@ onMounted(loadPickups);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--green);
   color: #fff;
-  font: 700 0.8rem var(--sans);
+  font: 700 0.72rem var(--sans);
 }
 .stop-body {
   flex: 1;
   min-width: 0;
-  border-radius: 16px;
-  background: var(--wash);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 .stop-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 12px 0;
-  margin-bottom: 10px;
+  gap: 8px;
+  padding: 9px 10px 0;
+  margin-bottom: 7px;
+}
+.stop-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--line);
+}
+.stop-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.stop-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font: 700 0.78rem var(--sans);
+  text-transform: uppercase;
 }
 .stop-identity {
+  flex: 1;
+  min-width: 0;
   cursor: pointer;
 }
 .stop-name {
   margin: 0;
-  font: 700 0.92rem var(--sans);
+  font: 700 0.85rem var(--sans);
   color: var(--ink);
 }
 .stop-phone {
+  margin: 1px 0 0;
+  color: #4b5563;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+.stop-pickup-time {
   margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 0.8rem;
+  color: #4b5563;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.stop-top-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
 }
 .chat-pill {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
+  gap: 3px;
+  padding: 4px 8px;
   border: 1px solid var(--green);
   border-radius: 999px;
   color: var(--green);
-  font: 700 0.66rem var(--sans);
+  font: 700 0.62rem var(--sans);
   text-decoration: none;
   white-space: nowrap;
 }
 .chat-pill svg {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
+}
+.status-badge {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font: 700 0.62rem var(--sans);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  background: var(--muted);
+  color: #fff;
+}
+.status-badge.pending,
+.status-badge.registered,
+.status-badge.printed {
+  background: var(--muted);
+  color: #fff;
+}
+.status-badge.in-progress {
+  background: var(--orange);
+  color: #fff;
+}
+.status-badge.on-route {
+  background: #1a73e8;
+  color: #fff;
+}
+.status-badge.picked-up {
+  background: var(--green);
+  color: #fff;
+}
+.status-badge.abort-pick-up,
+.status-badge.cancelled,
+.status-badge.deleted {
+  background: #e0433b;
+  color: #fff;
 }
 .stop-meta {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px 12px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 9px;
+}
+.distance-row {
+  display: flex;
+  justify-content: flex-end;
 }
 .distance-pill {
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: var(--green);
   color: #fff;
-  font: 700 0.78rem var(--sans);
+  font: 700 0.72rem var(--sans);
+}
+.distance-pill svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+.pill-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.view-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
 }
 .parcel-count {
-  color: var(--muted);
-  font-size: 0.8rem;
+  color: #4b5563;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.view-details-link {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--green);
+  font: 700 0.68rem var(--sans);
+}
+.view-details-link svg {
+  width: 13px;
+  height: 13px;
 }
 .stop-actions {
   display: flex;
-  border-top: 1px solid #fff;
-  padding: 10px 6px;
+  border-top: 1px solid var(--line);
+  padding: 6px 4px;
 }
 .action-item {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 4px 6px;
+  gap: 3px;
+  padding: 3px 4px;
   border: none;
   background: none;
-  color: var(--muted);
-  font: 600 0.68rem var(--sans);
+  color: #4b5563;
+  font: 700 0.64rem var(--sans);
   text-decoration: none;
   cursor: pointer;
 }
@@ -517,11 +717,8 @@ onMounted(loadPickups);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  width: 26px;
+  height: 26px;
 }
 .action-icon svg {
   width: 17px;
@@ -534,13 +731,12 @@ onMounted(loadPickups);
   color: var(--green);
 }
 .action-icon.depart {
-  background: #e0433b;
-  color: #fff;
-  font: 700 0.6rem var(--sans);
-  transition: background-color 0.15s ease;
+  color: #e0433b;
+  font: 700 0.66rem var(--sans);
+  transition: color 0.15s ease;
 }
 .action-icon.depart.on {
-  background: var(--green);
+  color: var(--green);
 }
 .depart-item.on {
   color: var(--green);

@@ -80,6 +80,12 @@ export interface PickupOrderPartner {
   shop?: PickupOrderShop;
 }
 
+export interface PickupOrderParcel {
+  id: string;
+  parcelUID?: string;
+  status: string;
+}
+
 export interface PickupOrderItem {
   id: string;
   driverId?: string;
@@ -96,6 +102,7 @@ export interface PickupOrderItem {
   pickupAt?: string;
   createdAt?: string;
   partner?: PickupOrderPartner;
+  parcels?: PickupOrderParcel[];
 }
 
 export interface PickupOrderListResult {

@@ -25,13 +25,7 @@ const showSettlementSheet = ref(false);
 // useDriverPresence is a singleton keyed off useAuth()'s bridged driver session
 // (see composables/useDriverPresence.ts), so this reads/drives the same online
 // state as every other page instead of needing a separate DriverPanel sign-in.
-const { isOnline, isSyncing: isTogglingOnline, presenceError, updatedAt, toggleOnline } = useDriverPresence();
-
-const presenceStatusText = computed(() => {
-  if (!updatedAt.value) return '';
-  const time = new Date(updatedAt.value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${isOnline.value ? 'Online' : 'Offline'} · updated ${time}`;
-});
+const { isOnline, isSyncing: isTogglingOnline, toggleOnline } = useDriverPresence();
 
 const RANGE_OPTIONS = [
   { key: 'today', label: 'Today', range: todayRange },
@@ -193,9 +187,6 @@ onMounted(async () => {
     </div>
 
     <main class="home-body">
-      <p v-if="presenceError" class="presence-error">{{ presenceError }}</p>
-      <p v-else-if="presenceStatusText" class="presence-status" :class="{ online: isOnline }">{{ presenceStatusText }}</p>
-
       <div class="settlement-card">
         <div class="settlement-header">
           <span class="settlement-icon">$</span>
@@ -695,29 +686,6 @@ onMounted(async () => {
 }
 .hint.error {
   color: #e33;
-}
-.presence-error {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #fff;
-  color: #e33;
-  font-size: 0.78rem;
-  text-align: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-}
-.presence-status {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #fff;
-  color: var(--muted);
-  font: 600 0.78rem var(--sans);
-  text-align: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-}
-.presence-status.online {
-  color: var(--green);
 }
 .chart-card {
   display: flex;

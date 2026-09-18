@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getOrderListByUser } from '../api/pickup-orders';
+import { DATE_RANGE_OPTIONS, todayRange, type DateRangeKey } from '../api/dashboard';
+import DateFilterSheet from '../components/DateFilterSheet.vue';
 import { useOrderDetailStore } from '../stores/orderDetail';
 import type { PickupOrderItem } from '../types/api';
 
@@ -11,6 +13,7 @@ const orderDetail = useOrderDetailStore();
 const orders = ref<PickupOrderItem[]>([]);
 const loading = ref(true);
 const error = ref('');
+const selectedRangeKey = ref<DateRangeKey>('today');
 
 function viewDetail(item: PickupOrderItem): void {
   orderDetail.setOrder(item);
@@ -52,13 +55,19 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = '';
   try {
-    const data = await getOrderListByUser({ status: [...HISTORY_STATUSES] }, 50, 0);
+    const { startAt, endAt } = DATE_RANGE_OPTIONS.find((option) => option.key === selectedRangeKey.value)?.range() ?? todayRange();
+    const data = await getOrderListByUser({ startAt, endAt, status: [...HISTORY_STATUSES] }, 50, 0);
     orders.value = data.results;
   } catch (err: any) {
     error.value = err.message ?? 'Failed to load pickup history';
   } finally {
     loading.value = false;
   }
+}
+
+function selectRange(key: DateRangeKey): void {
+  selectedRangeKey.value = key;
+  load();
 }
 
 onMounted(load);
@@ -73,6 +82,7 @@ onMounted(load);
         </svg>
       </button>
       <h1>Pickup History</h1>
+      <DateFilterSheet class="header-range" :model-value="selectedRangeKey" @update:model-value="selectRange" />
     </header>
 
     <p v-if="loading" class="hint">Loading...</p>
@@ -127,9 +137,14 @@ onMounted(load);
   height: 18px;
 }
 .page-header h1 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font: 700 1.15rem var(--heading);
   color: var(--ink);
+}
+.header-range {
+  flex-shrink: 0;
 }
 .hint {
   padding: 40px 20px;

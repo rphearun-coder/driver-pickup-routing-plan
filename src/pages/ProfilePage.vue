@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getMyProfile } from '../api/users';
 import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
+import { useDriverPresence } from '../composables/useDriverPresence';
 import EditProfileSheet from '../components/EditProfileSheet.vue';
 import ChangePasswordSheet from '../components/ChangePasswordSheet.vue';
 import type { AuthenticatedUser } from '../types/api';
 
 const auth = useAuthStore();
 const { logoutDriver } = useAuth();
+const { isOnline, presenceError, updatedAt } = useDriverPresence();
 const router = useRouter();
+
+const presenceStatusText = computed(() => {
+  if (!updatedAt.value) return '';
+  const time = new Date(updatedAt.value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${isOnline.value ? 'Online' : 'Offline'} · updated ${time}`;
+});
 const profile = ref<AuthenticatedUser | null>(null);
 const showEditProfile = ref(false);
 const showChangePassword = ref(false);
@@ -69,6 +77,9 @@ function onLogout() {
         <p v-if="profile?.phoneNumber" class="phone">{{ profile.phoneNumber }}</p>
       </div>
     </div>
+
+    <p v-if="presenceError" class="presence-error">{{ presenceError }}</p>
+    <p v-else-if="presenceStatusText" class="presence-status" :class="{ online: isOnline }">{{ presenceStatusText }}</p>
 
     <main class="page-body">
       <section class="settings-section">
@@ -170,6 +181,27 @@ function onLogout() {
   margin: 0;
   color: var(--muted);
   font: 500 0.9rem var(--sans);
+}
+.presence-error,
+.presence-status {
+  width: calc(100% - 40px);
+  max-width: 440px;
+  margin: 14px auto 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff;
+  font: 600 0.78rem var(--sans);
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+.presence-error {
+  color: #e33;
+}
+.presence-status {
+  color: var(--muted);
+}
+.presence-status.online {
+  color: var(--green);
 }
 .page-body {
   padding: 32px 16px 40px;

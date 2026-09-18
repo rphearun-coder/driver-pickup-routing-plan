@@ -1,11 +1,16 @@
 import axios from 'axios';
 import { postGraphQL } from '../lib/graphql-request';
+import { useAuthStore } from '../stores/auth';
 import type { PickupOrderListResult, PickupOrderStatus } from '../types/api';
+
+const ORDER_API_BASE_URL = import.meta.env.VITE_ORDER_SERVICE_URL ?? 'http://localhost:8082/v1';
+// The upload REST controller lives at the service root, not under the /v1 GraphQL path.
+const ORDER_REST_BASE_URL = ORDER_API_BASE_URL.replace(/\/v1\/?$/, '');
 
 // Jalat Location Service's order endpoint (see Jalat-Location-Service/app.test/driver-location.http,
 // "@orderHost") — same GraphQL query as its "getOrderListByUser" request.
 const orderHttp = axios.create({
-  baseURL: import.meta.env.VITE_ORDER_SERVICE_URL ?? 'http://localhost:8082/v1',
+  baseURL: ORDER_API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
     'x-platform': 'web',
@@ -48,6 +53,11 @@ const GET_ORDER_LIST_BY_USER_QUERY = `
           phoneNumber
           shop { shopName shopImage address longitude latitude zone { id commune } }
         }
+        parcels {
+          id
+          parcelUID
+          status
+        }
       }
       extraData {
         totalEstimatedDistanceMeters
@@ -77,6 +87,43 @@ export function updateOnRoute(orderId: string) {
   return queryOrders<{ updateOnRoute: boolean }>(UPDATE_ON_ROUTE_MUTATION, { id: orderId }).then(
     (data) => data.updateOnRoute,
   );
+}
+
+export interface ShopInfoInput {
+  shopImage?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+const CONFIRM_PICKUP_MUTATION = `
+  mutation ConfirmPickup($input: ConfirmPickupInput!) {
+    confirmPickup(input: $input)
+  }
+`;
+
+export function confirmPickup(orderId: string, shopInfo?: ShopInfoInput) {
+  return queryOrders<{ confirmPickup: boolean }>(CONFIRM_PICKUP_MUTATION, {
+    input: { id: orderId, shopInfo },
+  }).then((data) => data.confirmPickup);
+}
+
+// Bare OBS key (not a full URL) — matches resolveParcelImageUrl's convention in api/parcels.ts.
+// Note: Jalat-Order-Service's confirmPickup currently no-ops the shopImage it's sent (see
+// order.service.ts#confirmPickup — the updateShopInfo call is commented out, "disabled and to
+// be discussed") — the upload itself succeeds and the key is sent, but nothing displays it yet.
+export async function uploadPickupProof(file: File): Promise<string> {
+  const auth = useAuthStore();
+  const form = new FormData();
+  form.append('file', file);
+
+  const { data } = await axios.post<{ name: string }>(`${ORDER_REST_BASE_URL}/upload/v2/image`, form, {
+    params: { folder: 'parcel' },
+    headers: {
+      Authorization: auth.accessToken ? `Bearer ${auth.accessToken}` : '',
+    },
+  });
+  return data.name;
 }
 
 export function todayOrderFilter(): OrderListFilter {
