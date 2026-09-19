@@ -5,7 +5,7 @@ help:
 	@echo "  make install   - install dependencies"
 	@echo "  make dev       - run local dev server (wrangler dev)"
 	@echo "  make build     - build the project"
-	@echo "  make deploy    - deploy to Cloudflare (wrangler deploy)"
+	@echo "  make deploy    - build and deploy to Cloudflare Pages"
 	@echo "  make tail      - stream live logs from the deployed worker"
 	@echo "  make login     - authenticate wrangler with Cloudflare"
 	@echo "  make logout    - log wrangler out of Cloudflare"
@@ -22,7 +22,8 @@ build:
 	npm run build
 
 deploy:
-	npx wrangler deploy
+	npm run build
+	npx wrangler pages deploy dist --project-name jalat-location-app
 
 tail:
 	npx wrangler tail
