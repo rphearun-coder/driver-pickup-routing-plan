@@ -6,6 +6,7 @@ import { getDriverDashboard, thisMonthRange, thisWeekRange, todayRange, type Dat
 import { getUserNotifications } from '../api/notifications.ts';
 import { getMyDailyCodSettlement, type DailyCodSettlement } from '../api/cod-settlement.ts';
 import { useDriverPresence } from '../composables/useDriverPresence';
+import { useMobileInteraction } from '../composables/useMobileInteraction';
 import BrandLogo from '../components/BrandLogo.vue';
 import QrCodeCard from '../components/QrCodeCard.vue';
 import CodSettlementSheet from '../components/CodSettlementSheet.vue';
@@ -35,6 +36,12 @@ const RANGE_OPTIONS = [
 
 const selectedRangeKey = ref<(typeof RANGE_OPTIONS)[number]['key']>('today');
 const showRangeMenu = ref(false);
+
+useMobileInteraction(() => {
+  showQr.value = false;
+  showSettlementSheet.value = false;
+  showRangeMenu.value = false;
+});
 
 const selectedRangeLabel = computed(
   () => RANGE_OPTIONS.find((option) => option.key === selectedRangeKey.value)?.label ?? 'Today',

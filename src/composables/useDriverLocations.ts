@@ -47,7 +47,11 @@ export function useDriverLocations({ currentDriverId }: UseDriverLocationsOption
   if (currentDriverId) {
     const onLocation = (data: DriverLocation): void => {
       if (data.driverId !== currentDriverId.value) return;
-      driverLocations.set(data.driverId, data);
+      const lastUpdatedAt = Number(data.lastUpdatedAt);
+      driverLocations.set(data.driverId, {
+        ...data,
+        lastUpdatedAt: Number.isFinite(lastUpdatedAt) ? lastUpdatedAt : Date.now(),
+      });
       locationVersion.value++;
     };
     locationListeners.add(onLocation);

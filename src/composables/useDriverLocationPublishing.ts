@@ -122,6 +122,16 @@ function startWatching(): void {
   }, pollIntervalMs);
 }
 
+export function refreshDriverLocation(): void {
+  if (!isLiveMode.value || !isOnline.value || !currentDriverId.value || !navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    publishPosition,
+    () => undefined,
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 },
+  );
+}
+
 watch(
   [isLiveMode, isOnline, currentDriverId],
   ([live, online, driverId]) => {
@@ -141,5 +151,5 @@ if (typeof document !== 'undefined') {
 }
 
 export function useDriverLocationPublishing() {
-  return { locationError };
+  return { locationError, refreshLocation: refreshDriverLocation };
 }

@@ -14,6 +14,7 @@ import QrCodeCard from '../components/QrCodeCard.vue';
 import RangePicker from '../components/RangePicker.vue';
 import ScanQRCodeModal from '../components/ScanQRCodeModal.vue';
 import { useOrderDetailStore } from '../stores/orderDetail';
+import { useMobileInteraction } from '../composables/useMobileInteraction';
 import type { AuthenticatedUser, DriverDashboardSummary } from '../types/api.ts';
 
 const router = useRouter();
@@ -35,6 +36,12 @@ const selectedRangeKey = ref<DateRangeKey>('today');
 
 type FilterKey = 'to-go' | 'to-shop';
 const activeFilter = ref<FilterKey>('to-go');
+
+useMobileInteraction(() => {
+  showQr.value = false;
+  showScan.value = false;
+  scanMessage.value = '';
+});
 
 // "To Return": driver hasn't collected it yet. "In Progress": collected, on its
 // way back to the warehouse/shop. Matches ParcelStatusEnum in the order service.

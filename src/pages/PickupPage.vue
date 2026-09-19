@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import BrandLogo from '../components/BrandLogo.vue';
 import RangePicker from '../components/RangePicker.vue';
@@ -7,10 +7,16 @@ import { getOrderListByUser, updateOnRoute } from '../api/pickup-orders';
 import { resolveParcelImageUrl } from '../api/parcels';
 import { DATE_RANGE_OPTIONS, todayRange, type DateRangeKey } from '../api/dashboard';
 import { useOrderDetailStore } from '../stores/orderDetail';
+import { useAuth } from '../composables/useAuth';
+import { useDriverLocations } from '../composables/useDriverLocations';
+import { useMobileInteraction } from '../composables/useMobileInteraction';
 import type { PickupOrderItem, PickupOrderListResult, PickupOrderStatus } from '../types/api';
 
 const router = useRouter();
 const orderDetail = useOrderDetailStore();
+const { driverUser } = useAuth();
+const activeDriverId = computed(() => driverUser.value?.id ?? '');
+const { driverLocations } = useDriverLocations({ currentDriverId: activeDriverId });
 
 function viewDetail(item: PickupOrderItem): void {
   orderDetail.setOrder(item);
@@ -24,11 +30,23 @@ const departingIds = ref<Set<string>>(new Set());
 const showSearch = ref(false);
 const orderNoQuery = ref('');
 const selectedRangeKey = ref<DateRangeKey>('today');
+const currentTime = ref(Date.now());
+let currentTimeTimer: ReturnType<typeof setInterval> | null = null;
 
 const PICKED_UP_STATUSES = new Set(['PICKED_UP']);
 const FAILED_STATUSES = new Set(['ABORT_PICK_UP', 'CANCELLED', 'DELETED']);
 
 const stops = computed(() => orderData.value?.results ?? []);
+
+const lastDriverLocation = computed(() => driverLocations.get(activeDriverId.value));
+const lastDriverLocationText = computed(() => {
+  const updatedAt = lastDriverLocation.value?.lastUpdatedAt;
+  if (!updatedAt) return 'Waiting for location';
+  const elapsedSeconds = Math.max(0, Math.round((currentTime.value - updatedAt) / 1000));
+  if (elapsedSeconds < 5) return 'Updated just now';
+  if (elapsedSeconds < 60) return `Updated ${elapsedSeconds}s ago`;
+  return `Updated ${Math.round(elapsedSeconds / 60)}m ago`;
+});
 
 // No backend search-by-order-number filter exists for this list yet, so this
 // filters the already-loaded page of stops client-side by their order id.
@@ -43,6 +61,11 @@ const visibleStops = computed(() => {
 function clearSearch(): void {
   orderNoQuery.value = '';
 }
+
+useMobileInteraction(() => {
+  showSearch.value = false;
+  clearSearch();
+});
 
 const summary = computed(() => {
   const results = stops.value;
@@ -181,6 +204,12 @@ function selectRange(key: DateRangeKey): void {
 }
 
 onMounted(loadPickups);
+onMounted(() => {
+  currentTimeTimer = setInterval(() => (currentTime.value = Date.now()), 30000);
+});
+onBeforeUnmount(() => {
+  if (currentTimeTimer) clearInterval(currentTimeTimer);
+});
 </script>
 
 <template>
@@ -242,7 +271,13 @@ onMounted(loadPickups);
         <button type="button" @click="clearSearch">Clear</button>
       </div>
 
-      <div class="route-bar">{{ routeSummaryText }}</div>
+      <div class="route-bar">
+        <span>{{ routeSummaryText }}</span>
+        <span class="driver-location-status">
+          <span class="driver-location-dot" :class="{ active: lastDriverLocation }"></span>
+          {{ lastDriverLocationText }}
+        </span>
+      </div>
 
       <p v-if="loading" class="hint">Loading…</p>
       <p v-else-if="error" class="hint error">{{ error }}</p>
@@ -467,6 +502,10 @@ onMounted(loadPickups);
 }
 
 .route-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px;
   margin-bottom: 16px;
   border-radius: 14px;
@@ -474,6 +513,23 @@ onMounted(loadPickups);
   color: var(--ink);
   text-align: right;
   font: 700 1rem var(--heading);
+}
+.driver-location-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font: 600 0.68rem var(--sans);
+  white-space: nowrap;
+}
+.driver-location-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.driver-location-dot.active {
+  background: var(--green);
 }
 
 .stop-list {

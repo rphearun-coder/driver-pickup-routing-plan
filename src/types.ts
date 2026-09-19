@@ -2,6 +2,7 @@ export interface DriverLocation {
   driverId: string;
   lat: number | string;
   lon: number | string;
+  lastUpdatedAt?: number;
   driverShift?: number;
   shiftType?: number;
   [key: string]: unknown;

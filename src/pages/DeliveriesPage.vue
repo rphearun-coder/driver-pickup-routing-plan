@@ -9,6 +9,7 @@ import QrCodeCard from '../components/QrCodeCard.vue';
 import RangePicker from '../components/RangePicker.vue';
 import ScanQRCodeModal from '../components/ScanQRCodeModal.vue';
 import { useOrderDetailStore } from '../stores/orderDetail';
+import { useMobileInteraction } from '../composables/useMobileInteraction';
 import type { AuthenticatedUser, DriverDashboardSummary } from '../types/api.ts';
 
 const router = useRouter();
@@ -27,6 +28,12 @@ const scanMessage = ref('');
 const scanMessageType = ref<'success' | 'error'>('success');
 let scanMessageTimer: ReturnType<typeof setTimeout> | undefined;
 const selectedRangeKey = ref<DateRangeKey>('today');
+
+useMobileInteraction(() => {
+  showQr.value = false;
+  showScan.value = false;
+  scanMessage.value = '';
+});
 
 const deliveryItems = ref<Parcel[]>([]);
 const loading = ref(true);

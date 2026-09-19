@@ -5,6 +5,7 @@ import { getMyProfile } from '../api/users';
 import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
 import { useDriverPresence } from '../composables/useDriverPresence';
+import { useMobileInteraction } from '../composables/useMobileInteraction';
 import EditProfileSheet from '../components/EditProfileSheet.vue';
 import ChangePasswordSheet from '../components/ChangePasswordSheet.vue';
 import type { AuthenticatedUser } from '../types/api';
@@ -24,6 +25,11 @@ const showEditProfile = ref(false);
 const showChangePassword = ref(false);
 const toastMessage = ref('');
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+useMobileInteraction(() => {
+  showEditProfile.value = false;
+  showChangePassword.value = false;
+});
 
 async function loadProfile(): Promise<void> {
   try {
