@@ -19,10 +19,10 @@ dev:
 	npx wrangler dev
 
 build:
-	npm run build
+	npm run build -- --mode pro
 
 deploy:
-	npm run build
+	npm run build -- --mode pro
 	npx wrangler pages deploy dist --project-name jalat-location-app
 
 tail:
