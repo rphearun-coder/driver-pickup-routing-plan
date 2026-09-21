@@ -82,6 +82,7 @@ interface DriverLocationPayload {
   driverId: string;
   lat: number;
   lon: number;
+  lastUpdatedAt: number;
   driverShift: number;
   shiftType: number;
 }
@@ -104,6 +105,13 @@ export function publishDriverLocation(
   const latitude = validCoordinate(lat, -90, 90);
   const longitude = validCoordinate(lon, -180, 180);
   if (!driverId.trim() || latitude === null || longitude === null) return;
-  const payload: DriverLocationPayload = { driverId, lat: latitude, lon: longitude, driverShift, shiftType };
+  const payload: DriverLocationPayload = {
+    driverId,
+    lat: latitude,
+    lon: longitude,
+    lastUpdatedAt: Date.now(),
+    driverShift,
+    shiftType,
+  };
   client.publish(topicForDriver(driverId), JSON.stringify(payload), MQTT_PUBLISH_OPTIONS);
 }

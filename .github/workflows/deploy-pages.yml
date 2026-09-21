@@ -35,7 +35,7 @@ jobs:
         run: npm install --no-save --package-lock=false @rollup/rollup-linux-x64-gnu@4.63.1
 
       - name: Build production app
-        run: npm run build -- --mode pro
+        run: npm run build:pro
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@4 pages deploy dist --project-name jalat-location-app
