@@ -248,7 +248,7 @@ export function createDriverMarkerLayer(
   ensureInfoWindowStyleOverride();
   let meDriverId = currentDriverId;
   let meOverlay: PulsingMarkerOverlay | null = null;
-  let meOnline = false;
+  let meOnline = true;
   let meName = driverName;
   let meLastSeenAt = Date.now();
   let meData: DriverLocation | null = null;
@@ -287,6 +287,7 @@ export function createDriverMarkerLayer(
   function upsert(data: DriverLocation): void {
     const { driverId, lat, lon } = data;
     if (driverId == null || lat == null || lon == null || driverId !== meDriverId) return;
+    if (!meOnline) return;
 
     const position: LatLng = { lat: Number(lat), lng: Number(lon) };
     meLastSeenAt = Date.now();

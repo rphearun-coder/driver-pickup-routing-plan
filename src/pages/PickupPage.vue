@@ -39,6 +39,55 @@ const FAILED_STATUSES = new Set(['ABORT_PICK_UP', 'CANCELLED', 'DELETED']);
 const stops = computed(() => orderData.value?.results ?? []);
 
 const lastDriverLocation = computed(() => driverLocations.get(activeDriverId.value));
+const etaEligibleStatuses = new Set<PickupOrderStatus>(['IN_PROGRESS', 'ON_ROUTE']);
+
+function liveDistanceMeters(fromLat: number, fromLon: number, toLat: number, toLon: number): number {
+  const earthRadiusMeters = 6371000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(toLat - fromLat);
+  const longitudeDelta = toRadians(toLon - fromLon);
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(longitudeDelta / 2) ** 2;
+  return Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+const displayStops = computed(() => {
+  const location = lastDriverLocation.value;
+  const driverLat = Number(location?.lat);
+  const driverLon = Number(location?.lon);
+  if (!Number.isFinite(driverLat) || !Number.isFinite(driverLon)) return stops.value;
+
+  return stops.value
+    .map((item) => {
+      const pickupLat = Number(item.pickupLatitude);
+      const pickupLon = Number(item.pickupLongitude);
+      if (
+        !etaEligibleStatuses.has(item.status) ||
+        !Number.isFinite(pickupLat) ||
+        !Number.isFinite(pickupLon) ||
+        (pickupLat === 0 && pickupLon === 0)
+      ) {
+        return item;
+      }
+
+      const estimatedDistanceMeters = liveDistanceMeters(driverLat, driverLon, pickupLat, pickupLon);
+      const estimatedDurationSeconds = Math.round(estimatedDistanceMeters / (30000 / 3600));
+      return {
+        ...item,
+        estimatedDistanceMeters,
+        estimatedDurationSeconds,
+        estimatedDistanceMetersText: estimatedDistanceMeters < 1000
+          ? `${estimatedDistanceMeters}m`
+          : `${(estimatedDistanceMeters / 1000).toFixed(1)}km`,
+        estimatedDurationSecondsText: estimatedDurationSeconds < 60
+          ? `${estimatedDurationSeconds}sec`
+          : `${Math.round(estimatedDurationSeconds / 60)}min`,
+      };
+    })
+    .sort((a, b) => (a.estimatedDistanceMeters ?? Infinity) - (b.estimatedDistanceMeters ?? Infinity));
+});
+
 const lastDriverLocationText = computed(() => {
   const updatedAt = lastDriverLocation.value?.lastUpdatedAt;
   if (!updatedAt) return 'Waiting for location';
@@ -54,8 +103,8 @@ const lastDriverLocationText = computed(() => {
 // full day's totals regardless of an active search.
 const visibleStops = computed(() => {
   const query = orderNoQuery.value.trim().toLowerCase();
-  if (!query) return stops.value;
-  return stops.value.filter((item) => item.id.toLowerCase().includes(query));
+  if (!query) return displayStops.value;
+  return displayStops.value.filter((item) => item.id.toLowerCase().includes(query));
 });
 
 function clearSearch(): void {
@@ -111,6 +160,18 @@ function formatDistanceParts(meters?: number, seconds?: number, metersText?: str
 }
 
 const routeSummaryText = computed(() => {
+  if (lastDriverLocation.value) {
+    const totalDistance = displayStops.value.reduce(
+      (sum, item) => sum + (item.estimatedDistanceMeters ?? 0),
+      0,
+    );
+    const totalDuration = displayStops.value.reduce(
+      (sum, item) => sum + (item.estimatedDurationSeconds ?? 0),
+      0,
+    );
+    return formatDistance(totalDistance, totalDuration);
+  }
+
   const extra = orderData.value?.extraData;
   return formatDistance(
     extra?.totalEstimatedDistanceMeters,

@@ -23,6 +23,10 @@ export function useRoutePlayback({
   const isPlayingRoute = ref(false);
   const isPaused = ref(false);
   const isSimulating = ref(true);
+  const routeDistanceText = ref('');
+  const routeDurationText = ref('');
+  const routeDurationSeconds = ref(0);
+  const routeArrivalEta = ref('');
 
   let routePolyline: any = null;
   let previewPolyline: any = null;
@@ -33,7 +37,12 @@ export function useRoutePlayback({
   let lastRouteRefreshAt = 0;
   const ROUTE_REFRESH_MIN_INTERVAL_MS = 20000;
 
-  async function fetchDrivingPath(destination: LatLng): Promise<any[] | null> {
+  function formatEta(seconds: number): string {
+    const arrivalTime = new Date(Date.now() + seconds * 1000);
+    return arrivalTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  async function fetchDrivingDetails(destination: LatLng): Promise<{ path: any[]; distanceText: string; durationText: string; durationSeconds: number } | null> {
     const google = getGoogle();
     if (!google) return null;
     try {
@@ -43,8 +52,16 @@ export function useRoutePlayback({
         destination,
         travelMode: google.maps.TravelMode.DRIVING,
       });
-      const path = result.routes?.[0]?.overview_path;
-      return path && path.length ? path : null;
+      const route = result.routes?.[0];
+      const path = route?.overview_path;
+      if (!path || !path.length) return null;
+
+      const leg = route.legs?.[0];
+      const distanceText = leg?.distance?.text ?? '';
+      const durationText = leg?.duration?.text ?? '';
+      const durationSeconds = leg?.duration?.value ?? 0;
+
+      return { path, distanceText, durationText, durationSeconds };
     } catch (err) {
       console.error('Directions request failed:', err);
       return null;
@@ -63,17 +80,29 @@ export function useRoutePlayback({
 
     clearPreview();
 
-    const path = await fetchDrivingPath(destination);
-    if (!path) return;
+    const details = await fetchDrivingDetails(destination);
+    if (!details) return;
+
+    routeDistanceText.value = details.distanceText;
+    routeDurationText.value = details.durationText;
+    routeDurationSeconds.value = details.durationSeconds;
+    routeArrivalEta.value = formatEta(details.durationSeconds);
 
     previewPolyline = new google.maps.Polyline({
-      path,
+      path: details.path,
       map,
-      strokeColor: '#1a73e8',
-      strokeOpacity: 0,
+      strokeColor: '#000000',
+      strokeOpacity: 0.95,
       strokeWeight: 5,
-      icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, strokeWeight: 5, scale: 4 }, offset: '0', repeat: '16px' }],
     });
+
+    const bounds = new google.maps.LatLngBounds();
+    details.path.forEach((point: any) => bounds.extend(point));
+    try {
+      map.fitBounds(bounds, { top: 80, right: 40, bottom: 320, left: 40 });
+    } catch {
+      map.fitBounds(bounds, 80);
+    }
   }
 
   function stopRoute(): void {
@@ -105,16 +134,21 @@ export function useRoutePlayback({
     const map = getMap();
     if (!google || !map) return;
 
-    const path = await fetchDrivingPath(activeDestination);
-    if (!path || !isPlayingRoute.value) return;
+    const details = await fetchDrivingDetails(activeDestination);
+    if (!details || !isPlayingRoute.value) return;
+
+    routeDistanceText.value = details.distanceText;
+    routeDurationText.value = details.durationText;
+    routeDurationSeconds.value = details.durationSeconds;
+    routeArrivalEta.value = formatEta(details.durationSeconds);
 
     routePolyline?.setMap(null);
     routePolyline = new google.maps.Polyline({
-      path,
+      path: details.path,
       map,
-      strokeColor: '#1a73e8',
-      strokeOpacity: 0.85,
-      strokeWeight: 4,
+      strokeColor: '#000000',
+      strokeOpacity: 0.95,
+      strokeWeight: 5,
     });
   }
 
@@ -167,29 +201,38 @@ export function useRoutePlayback({
 
     stopRoute();
 
-    const path = await fetchDrivingPath(destination);
-    if (!path) return;
+    const details = await fetchDrivingDetails(destination);
+    if (!details) return;
+
+    routeDistanceText.value = details.distanceText;
+    routeDurationText.value = details.durationText;
+    routeDurationSeconds.value = details.durationSeconds;
+    routeArrivalEta.value = formatEta(details.durationSeconds);
 
     clearPreview();
 
     routePolyline = new google.maps.Polyline({
-      path,
+      path: details.path,
       map,
-      strokeColor: '#1a73e8',
-      strokeOpacity: 0.85,
-      strokeWeight: 4,
+      strokeColor: '#000000',
+      strokeOpacity: 0.95,
+      strokeWeight: 5,
     });
 
     const bounds = new google.maps.LatLngBounds();
-    path.forEach((point: any) => bounds.extend(point));
-    map.fitBounds(bounds, 80);
+    details.path.forEach((point: any) => bounds.extend(point));
+    try {
+      map.fitBounds(bounds, { top: 80, right: 40, bottom: 320, left: 40 });
+    } catch {
+      map.fitBounds(bounds, 80);
+    }
 
     activeDestination = destination;
     lastRouteRefreshAt = Date.now();
     isSimulating.value = simulate;
     isPlayingRoute.value = true;
     if (simulate) {
-      activePath = path;
+      activePath = details.path;
       activeIndex = 0;
       startTimer();
     }
@@ -200,5 +243,20 @@ export function useRoutePlayback({
     clearPreview();
   });
 
-  return { isPlayingRoute, isPaused, isSimulating, previewRoute, playRoute, pauseRoute, resumeRoute, stopRoute, refreshRoute };
+  return {
+    isPlayingRoute,
+    isPaused,
+    isSimulating,
+    routeDistanceText,
+    routeDurationText,
+    routeDurationSeconds,
+    routeArrivalEta,
+    previewRoute,
+    playRoute,
+    pauseRoute,
+    resumeRoute,
+    stopRoute,
+    refreshRoute,
+    clearPreview,
+  };
 }

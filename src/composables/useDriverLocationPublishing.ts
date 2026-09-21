@@ -8,11 +8,13 @@ interface PublishedPosition {
   lat: number;
   lon: number;
   publishedAt: number;
+  accuracy: number;
 }
 
 const FOREGROUND_INTERVAL_MS = 4000;
 const BACKGROUND_INTERVAL_MS = 30000;
-const MINIMUM_DISTANCE_METERS = 15;
+const MINIMUM_DISTANCE_METERS = 30;
+const MAXIMUM_ACCEPTED_ACCURACY_METERS = 50;
 
 // Matches Jalat-Location-Service's ShiftMapEnum (MORNING = 1, AFTERNOON = 2) — the Order
 // Service looks up the driver's location tagged with the pickup order's own time slot, so
@@ -66,24 +68,28 @@ function publishPosition(position: GeolocationPosition): void {
   const driverId = currentDriverId.value;
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
+  const accuracy = position.coords.accuracy;
   const timestamp = position.timestamp;
   if (!driverId || !Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(timestamp)) return;
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+  if (!Number.isFinite(accuracy) || accuracy > MAXIMUM_ACCEPTED_ACCURACY_METERS) return;
 
   const publishedAt = Date.now();
-  const isBackground = document.visibilityState === 'hidden';
-  const intervalMs = isBackground ? BACKGROUND_INTERVAL_MS : FOREGROUND_INTERVAL_MS;
-  const movedEnough =
-    !lastPublishedPosition || distanceMeters(lastPublishedPosition, { lat, lon }) >= MINIMUM_DISTANCE_METERS;
-  const intervalElapsed = !lastPublishedPosition || publishedAt - lastPublishedPosition.publishedAt >= intervalMs;
-  if (isBackground ? !intervalElapsed : !movedEnough && !intervalElapsed) return;
+  const distance = lastPublishedPosition
+    ? distanceMeters(lastPublishedPosition, { lat, lon })
+    : Number.POSITIVE_INFINITY;
+  const uncertaintyThreshold = lastPublishedPosition
+    ? lastPublishedPosition.accuracy + accuracy
+    : 0;
+  const movedEnough = distance >= Math.max(MINIMUM_DISTANCE_METERS, uncertaintyThreshold);
+  if (!movedEnough) return;
 
   // driverShift 1 = PICKUP (Jalat-Location-Service's DriverShiftEnum) — every distance
   // lookup on the Order service side (pickup list, driver daily activity) hardcodes
   // 'PICKUP' when reading this driver's last location back, so anything published under
   // a different driverShift is never found, silently leaving pickup distance at 0.
   publishOwnLocation(driverId, lat, lon, { driverShift: 1, shiftType: currentShiftType() });
-  lastPublishedPosition = { lat, lon, publishedAt };
+  lastPublishedPosition = { lat, lon, publishedAt, accuracy };
 }
 
 function startWatching(): void {
