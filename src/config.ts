@@ -5,7 +5,6 @@ export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 export const MQTT_WS_URL = import.meta.env.VITE_MQTT_WS_URL;
 export const MQTT_USERNAME = import.meta.env.VITE_MQTT_USERNAME;
 export const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD;
-export const MQTT_TOPIC = import.meta.env.VITE_MQTT_TOPIC || '/topic/driver/+/location';
 
 export const PICKUP_POLL_INTERVAL_MS = Number(import.meta.env.VITE_PICKUP_POLL_INTERVAL_MS) || 15000;
 

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { postGraphQL } from '../lib/graphql-request';
-import { useAuthStore } from '../stores/auth';
+import { uploadImageToFolder } from '../lib/upload-request';
 
 // Jalat Order Service — see Jalat-Order-Service/src/graphql/parcel/parcel.resolver.ts.
 // Both return parcels ("driverListReturnParcel", @Auth('DRIVER')) and the driver's
@@ -23,18 +23,8 @@ function queryOrders<T>(query: string, variables: Record<string, unknown> = {}) 
 }
 
 // Bare OBS key (not a full URL) — matches resolveParcelImageUrl's convention below.
-export async function uploadParcelProof(file: File): Promise<string> {
-  const auth = useAuthStore();
-  const form = new FormData();
-  form.append('file', file);
-
-  const { data } = await axios.post<{ name: string }>(`${ORDER_REST_BASE_URL}/upload/v2/image`, form, {
-    params: { folder: 'parcel' },
-    headers: {
-      Authorization: auth.accessToken ? `Bearer ${auth.accessToken}` : '',
-    },
-  });
-  return data.name;
+export function uploadParcelProof(file: File): Promise<string> {
+  return uploadImageToFolder(ORDER_REST_BASE_URL, file, 'parcel');
 }
 
 // parcelImage/receiptImage are bare object keys, not URLs (see Jalat-Order-Service's
@@ -46,6 +36,13 @@ export function resolveParcelImageUrl(key?: string): string {
   if (!key) return '';
   if (/^https?:\/\//.test(key)) return key;
   return `${OBS_BASE_URL}/${key}`;
+}
+
+// partnerStoreName is a denormalized scalar that's often blank on older/partner-
+// integration parcels — the resolved partner relation (partner.fullName / shop.shopName)
+// is the live source of truth and rarely empty, so it's tried first.
+export function parcelSellerName(item: Parcel): string {
+  return item.partner?.fullName || item.partner?.shop?.shopName || item.partnerStoreName || '';
 }
 
 // Matches ParcelStatusEnum in Jalat-Order-Service/src/common/types/parcel.enum.ts
@@ -63,6 +60,8 @@ export type ParcelStatus =
   | 'RETURNING_FROM_DRIVER'
   | 'PROCESSING_RETURN';
 
+export type ReceiverBy = 'DRIVER' | 'SELLER';
+
 export interface Parcel {
   id: string;
   orderId: string;
@@ -71,14 +70,21 @@ export interface Parcel {
   recipientName?: string;
   recipientNumber?: string;
   partnerStoreName?: string;
+  partner?: { fullName?: string; shop?: { shopName?: string } };
   location?: string;
   deliveryAddress?: string;
   deliveryLatitude?: number;
   deliveryLongitude?: number;
   parcelImage?: string;
   receiptImage?: string;
+  proofImage?: string;
+  proofOfFailed?: string;
   codUsd?: number;
+  codRiel?: number;
+  totalCOD?: number;
   price?: number;
+  receiverBy?: ReceiverBy;
+  reason?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -96,14 +102,21 @@ const PARCEL_FIELDS = `
   recipientName
   recipientNumber
   partnerStoreName
+  partner { fullName shop { shopName } }
   location
   deliveryAddress
   deliveryLatitude
   deliveryLongitude
   parcelImage
   receiptImage
+  proofImage
+  proofOfFailed
   codUsd
+  codRiel
+  totalCOD
   price
+  receiverBy
+  reason
   createdAt
   updatedAt
 `;
@@ -193,15 +206,56 @@ const FINISH_DELIVERY_MUTATION = `
   }
 `;
 
+export interface FinishDeliveryOptions {
+  id: string;
+  receiverBy: ReceiverBy;
+  proofImage?: string;
+  // Required by the backend when receiverBy is SELLER (see parcel.service.ts
+  // finishDelivery — throws "ភស្តុតាងនៃប្រតិបត្តិការត្រូវបានទាមទារ" without it).
+  receiptImage?: string;
+  amountUSD?: number;
+  amountKHR?: number;
+}
+
 // Requires the parcel to already be ON_DELIVERY and belong to this driver (see
-// parcel.service.ts finishDelivery). receiverBy is fixed to DRIVER — that's the
-// "handed straight to the customer" path and doesn't require a receiptImage
-// (only receiverBy: SELLER does). amountUSD carries the parcel's own known COD
-// total through rather than asking the driver to retype it.
-export function finishParcelDelivery(id: string, proofImage: string, amountUSD?: number): Promise<Parcel> {
+// parcel.service.ts finishDelivery).
+export function finishParcelDelivery(options: FinishDeliveryOptions): Promise<Parcel> {
+  const { id, receiverBy, proofImage, receiptImage, amountUSD, amountKHR } = options;
   return queryOrders<{ finishDelivery: Parcel }>(FINISH_DELIVERY_MUTATION, {
-    input: { id, receiverBy: 'DRIVER', proofImage, amountUSD: amountUSD || 0 },
+    input: { id, receiverBy, proofImage, receiptImage, amountUSD: amountUSD || 0, amountKHR: amountKHR || 0 },
   }).then((data) => data.finishDelivery);
+}
+
+const SEND_DELIVERY_ASSISTANT_MESSAGE_MUTATION = `
+  mutation SendAssistantMessage($input: SendMessageInput!) {
+    sendAssistantMessage(input: $input)
+  }
+`;
+
+// roomId is the parcel's own id (see Jalat-Order-Service's assistant-message
+// module — deliveryFailed below reads this same room by parcel id). deliveryFailed
+// requires one of these to exist for today before it'll let the driver mark a
+// parcel failed, so this is step one of that flow, not an optional side-channel.
+export function sendDeliveryAssistantMessage(parcelId: string, message: string): Promise<boolean> {
+  return queryOrders<{ sendAssistantMessage: boolean }>(SEND_DELIVERY_ASSISTANT_MESSAGE_MUTATION, {
+    input: { roomId: parcelId, message, messageType: 'TEXT' },
+  }).then((data) => data.sendAssistantMessage);
+}
+
+const DELIVERY_FAILED_MUTATION = `
+  mutation DeliveryFailed($input: DeliveryFailedInput!) {
+    deliveryFailed(input: $input)
+  }
+`;
+
+// The parcel must already be ON_DELIVERY, and a sendDeliveryAssistantMessage for it
+// must have been sent today, at least Settings.driverMarkAsDeliveryFailedDuration
+// minutes ago (see parcel.service.ts deliveryFailed) — otherwise this throws a
+// (Khmer) BadRequestException explaining which of those isn't satisfied yet.
+export function markDeliveryFailed(id: string, reason: string, proofOfFailed?: string): Promise<boolean> {
+  return queryOrders<{ deliveryFailed: boolean }>(DELIVERY_FAILED_MUTATION, {
+    input: { id, reason, proofOfFailed },
+  }).then((data) => data.deliveryFailed);
 }
 
 const CONFIRM_RETURN_PARCEL_MUTATION = `

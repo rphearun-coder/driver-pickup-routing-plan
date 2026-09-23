@@ -12,6 +12,12 @@ function select(key: DateRangeKey): void {
   emit('update:modelValue', key);
 }
 
+function close(): void {
+  open.value = false;
+}
+
+defineExpose({ close });
+
 const previousBodyOverflow = document.body.style.overflow;
 watch(open, (isOpen) => {
   document.body.style.overflow = isOpen ? 'hidden' : previousBodyOverflow;

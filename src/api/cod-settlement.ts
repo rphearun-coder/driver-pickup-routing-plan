@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { postGraphQL } from '../lib/graphql-request';
-import { useAuthStore } from '../stores/auth';
+import { uploadImageToFolder } from '../lib/upload-request';
 
 const ORDER_API_BASE_URL = import.meta.env.VITE_ORDER_SERVICE_URL ?? 'http://localhost:8082/v1';
 // The upload REST controller lives at the service root, not under the /v1 GraphQL path.
@@ -118,16 +118,6 @@ export function submitCodSettlement(input: { id: string; proofImage: string; dri
 
 // Bare OBS key (not a full URL) — matches the convention used for parcel/receipt
 // images elsewhere, resolved against VITE_OBS_BASE_URL when displayed.
-export async function uploadSettlementProof(file: File): Promise<string> {
-  const auth = useAuthStore();
-  const form = new FormData();
-  form.append('file', file);
-
-  const { data } = await axios.post<{ name: string }>(`${ORDER_REST_BASE_URL}/upload/v2/image`, form, {
-    params: { folder: 'other' },
-    headers: {
-      Authorization: auth.accessToken ? `Bearer ${auth.accessToken}` : '',
-    },
-  });
-  return data.name;
+export function uploadSettlementProof(file: File): Promise<string> {
+  return uploadImageToFolder(ORDER_REST_BASE_URL, file, 'other');
 }

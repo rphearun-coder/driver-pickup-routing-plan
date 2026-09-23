@@ -6,6 +6,7 @@ import { DATE_RANGE_OPTIONS, getDriverDashboard, todayRange, type DateRangeKey }
 import {
   confirmReturnParcelFromWarehouse,
   driverListReturnParcel,
+  parcelSellerName,
   resolveParcelImageUrl,
   type Parcel,
 } from '../api/parcels.ts';
@@ -65,7 +66,7 @@ function returnThumb(item: Parcel): string {
 }
 
 function returnRecipient(item: Parcel): string {
-  return item.recipientName || item.partnerStoreName || item.location || 'Unknown';
+  return item.recipientName || parcelSellerName(item) || item.location || 'Unknown';
 }
 
 function isWithinRange(dateStr: string | undefined, startAt: string, endAt: string): boolean {

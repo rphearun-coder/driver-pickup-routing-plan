@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import PhoneNumberInput from './PhoneNumberInput.vue';
-import { getMyFullProfile, updateMyProfile, type FullProfile } from '../api/users';
+import { getMyFullProfile, updateMyProfile, uploadAvatarImage, type FullProfile } from '../api/users';
+import { resolveParcelImageUrl } from '../api/parcels';
+import { avatarColor, avatarInitials } from '../lib/avatar';
+import { prepareAvatarImage } from '../lib/image';
 
 const emit = defineEmits<{ close: []; saved: [] }>();
 
@@ -11,6 +14,10 @@ const error = ref('');
 const fullProfile = ref<FullProfile | null>(null);
 const fullName = ref('');
 const phoneNumber = ref('');
+const avatarKey = ref('');
+const avatarPreviewUrl = ref('');
+const avatarUploading = ref(false);
+const avatarInput = ref<HTMLInputElement | null>(null);
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -20,10 +27,40 @@ async function load(): Promise<void> {
     fullProfile.value = profile;
     fullName.value = profile.fullName ?? '';
     phoneNumber.value = profile.phoneNumber ?? '';
+    avatarKey.value = profile.avatar ?? '';
   } catch (err: any) {
     error.value = err.message ?? 'Failed to load profile.';
   } finally {
     loading.value = false;
+  }
+}
+
+function revokePreview(): void {
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value);
+  avatarPreviewUrl.value = '';
+}
+
+function onAvatarPick(): void {
+  avatarInput.value?.click();
+}
+
+async function onAvatarChange(event: Event): Promise<void> {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  (event.target as HTMLInputElement).value = '';
+  if (!file) return;
+
+  error.value = '';
+  avatarUploading.value = true;
+  try {
+    const prepared = await prepareAvatarImage(file);
+    revokePreview();
+    avatarPreviewUrl.value = URL.createObjectURL(prepared);
+    avatarKey.value = await uploadAvatarImage(prepared);
+  } catch (err: any) {
+    revokePreview();
+    error.value = err.message ?? 'Failed to upload photo.';
+  } finally {
+    avatarUploading.value = false;
   }
 }
 
@@ -38,7 +75,7 @@ async function onSubmit(): Promise<void> {
     await updateMyProfile({
       fullName: fullName.value.trim(),
       phoneNumber: phoneNumber.value,
-      avatar: fullProfile.value.avatar,
+      avatar: avatarKey.value,
       bankAccounts: fullProfile.value.bankAccounts,
       driverProfile: fullProfile.value.driverProfile,
     });
@@ -59,6 +96,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.body.style.overflow = previousBodyOverflow;
+  revokePreview();
 });
 </script>
 
@@ -70,6 +108,22 @@ onUnmounted(() => {
 
       <p v-if="loading" class="hint">Loading...</p>
       <template v-else>
+        <div class="avatar-picker">
+          <button type="button" class="avatar-btn" :disabled="avatarUploading" @click="onAvatarPick">
+            <img v-if="avatarPreviewUrl || avatarKey" :src="avatarPreviewUrl || resolveParcelImageUrl(avatarKey)" alt="" />
+            <span v-else class="avatar-fallback" :style="{ background: avatarColor(fullName) }">
+              {{ avatarInitials(fullName) || '?' }}
+            </span>
+            <span v-if="avatarUploading" class="avatar-spinner"></span>
+            <span class="avatar-edit-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4M12 4l-4 4M12 4l4 4" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+              </svg>
+            </span>
+          </button>
+        </div>
+        <input ref="avatarInput" type="file" accept="image/*" class="avatar-file-input" @change="onAvatarChange" />
+
         <label class="field-label" for="edit-profile-name">Full name</label>
         <input id="edit-profile-name" v-model="fullName" type="text" class="text-input" placeholder="Full name" />
 
@@ -78,7 +132,7 @@ onUnmounted(() => {
 
         <p v-if="error" class="error-text">{{ error }}</p>
 
-        <button type="button" class="confirm-btn" :disabled="saving" @click="onSubmit">
+        <button type="button" class="confirm-btn" :disabled="saving || avatarUploading" @click="onSubmit">
           {{ saving ? 'Saving...' : 'Save Changes' }}
         </button>
       </template>
@@ -127,6 +181,87 @@ onUnmounted(() => {
   padding: 20px 0;
   text-align: center;
   color: var(--muted);
+}
+.avatar-picker {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.avatar-btn {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--wash);
+  cursor: pointer;
+  overflow: visible;
+}
+.avatar-btn:disabled {
+  cursor: default;
+}
+.avatar-btn img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: #fff;
+  font: 700 1.6rem var(--heading);
+}
+.avatar-spinner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+}
+.avatar-spinner::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: avatar-spin 0.8s linear infinite;
+}
+@keyframes avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.avatar-edit-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+}
+.avatar-edit-badge svg {
+  width: 14px;
+  height: 14px;
+}
+.avatar-file-input {
+  display: none;
 }
 .field-label {
   display: block;

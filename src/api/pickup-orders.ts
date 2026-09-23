@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { postGraphQL } from '../lib/graphql-request';
-import { useAuthStore } from '../stores/auth';
+import { uploadImageToFolder } from '../lib/upload-request';
 import type { PickupOrderListResult, PickupOrderStatus } from '../types/api';
 
 const ORDER_API_BASE_URL = import.meta.env.VITE_ORDER_SERVICE_URL ?? 'http://localhost:8082/v1';
@@ -112,18 +112,8 @@ export function confirmPickup(orderId: string, shopInfo?: ShopInfoInput) {
 // Note: Jalat-Order-Service's confirmPickup currently no-ops the shopImage it's sent (see
 // order.service.ts#confirmPickup — the updateShopInfo call is commented out, "disabled and to
 // be discussed") — the upload itself succeeds and the key is sent, but nothing displays it yet.
-export async function uploadPickupProof(file: File): Promise<string> {
-  const auth = useAuthStore();
-  const form = new FormData();
-  form.append('file', file);
-
-  const { data } = await axios.post<{ name: string }>(`${ORDER_REST_BASE_URL}/upload/v2/image`, form, {
-    params: { folder: 'parcel' },
-    headers: {
-      Authorization: auth.accessToken ? `Bearer ${auth.accessToken}` : '',
-    },
-  });
-  return data.name;
+export function uploadPickupProof(file: File): Promise<string> {
+  return uploadImageToFolder(ORDER_REST_BASE_URL, file, 'parcel');
 }
 
 export function todayOrderFilter(): OrderListFilter {

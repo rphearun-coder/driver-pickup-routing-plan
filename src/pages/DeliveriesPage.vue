@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { getMyProfile } from '../api/users.ts';
 import { DATE_RANGE_OPTIONS, getDriverDashboard, todayRange, type DateRangeKey } from '../api/dashboard.ts';
-import { getDeliveryList, resolveParcelImageUrl, scanParcelQrCode, type Parcel } from '../api/parcels.ts';
+import { getDeliveryList, parcelSellerName, resolveParcelImageUrl, scanParcelQrCode, type Parcel } from '../api/parcels.ts';
 import BrandLogo from '../components/BrandLogo.vue';
-import QrCodeCard from '../components/QrCodeCard.vue';
 import RangePicker from '../components/RangePicker.vue';
 import ScanQRCodeModal from '../components/ScanQRCodeModal.vue';
 import { useOrderDetailStore } from '../stores/orderDetail';
 import { useMobileInteraction } from '../composables/useMobileInteraction';
-import type { AuthenticatedUser, DriverDashboardSummary } from '../types/api.ts';
+import type { DriverDashboardSummary } from '../types/api.ts';
 
 const router = useRouter();
 const orderDetail = useOrderDetailStore();
@@ -20,17 +18,20 @@ function viewDetail(item: Parcel): void {
   router.push({ name: 'parcel-detail', params: { id: item.id } });
 }
 
-const profile = ref<AuthenticatedUser | null>(null);
 const stats = ref<DriverDashboardSummary | null>(null);
-const showQr = ref(false);
 const showScan = ref(false);
 const scanMessage = ref('');
 const scanMessageType = ref<'success' | 'error'>('success');
 let scanMessageTimer: ReturnType<typeof setTimeout> | undefined;
 const selectedRangeKey = ref<DateRangeKey>('today');
+const rangePicker = ref<InstanceType<typeof RangePicker> | null>(null);
+
+function openScan(): void {
+  rangePicker.value?.close();
+  showScan.value = true;
+}
 
 useMobileInteraction(() => {
-  showQr.value = false;
   showScan.value = false;
   scanMessage.value = '';
 });
@@ -39,6 +40,13 @@ const deliveryItems = ref<Parcel[]>([]);
 const loading = ref(true);
 const error = ref('');
 const brokenThumbIds = ref<Set<string>>(new Set());
+const searchPhone = ref('');
+
+const filteredDeliveryItems = computed(() => {
+  const query = searchPhone.value.trim();
+  if (!query) return deliveryItems.value;
+  return deliveryItems.value.filter((item) => (item.recipientNumber || '').includes(query));
+});
 
 function onThumbError(itemId: string): void {
   brokenThumbIds.value.add(itemId);
@@ -55,7 +63,7 @@ function formatUSD(amount: number): string {
 }
 
 function deliveryCustomer(item: Parcel): string {
-  return item.recipientName || item.partnerStoreName || item.location || 'Unknown';
+  return item.recipientName || parcelSellerName(item) || item.location || 'Unknown';
 }
 
 // orderId is the parent order and is often shared by several parcels in the
@@ -157,11 +165,6 @@ async function onQrScanned(rawValue: string): Promise<void> {
 }
 
 onMounted(async () => {
-  try {
-    profile.value = await getMyProfile();
-  } catch {
-    profile.value = null;
-  }
   await loadStats();
   loadDeliveries();
 });
@@ -170,22 +173,24 @@ onMounted(async () => {
 <template>
   <div class="deliveries-page">
     <header class="page-header">
-      <div class="header-brand">
-        <BrandLogo :size="38" />
-        <span class="brand-text">
-          <strong>Jalat</strong>
-          <em>Logistic</em>
-        </span>
+      <div class="header-top">
+        <div class="header-brand">
+          <BrandLogo :size="38" />
+          <span class="brand-text">
+            <strong>Jalat</strong>
+            <em>Logistic</em>
+          </span>
+        </div>
+        <div class="header-actions">
+          <RangePicker ref="rangePicker" :model-value="selectedRangeKey" @update:model-value="selectRange" />
+        </div>
       </div>
-      <div class="header-actions">
-        <RangePicker :model-value="selectedRangeKey" @update:model-value="selectRange" />
-        <button type="button" class="icon-btn" aria-label="Show my QR code" @click="showQr = true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7V4a1 1 0 0 1 1-1h3M21 7V4a1 1 0 0 0-1-1h-3M3 17v3a1 1 0 0 0 1 1h3M21 17v3a1 1 0 0 1-1 1h-3" />
-            <rect x="7" y="7" width="4" height="4" /><rect x="13" y="7" width="4" height="4" />
-            <rect x="7" y="13" width="4" height="4" /><rect x="13" y="13" width="4" height="4" />
-          </svg>
-        </button>
+
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+        </svg>
+        <input v-model="searchPhone" type="tel" inputmode="tel" placeholder="Search by phone number" />
       </div>
     </header>
 
@@ -222,7 +227,7 @@ onMounted(async () => {
     </section>
 
     <main class="page-body">
-      <button type="button" class="scan-btn" @click="showScan = true">
+      <button type="button" class="scan-btn" @click="openScan">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 7V4a1 1 0 0 1 1-1h3M21 7V4a1 1 0 0 0-1-1h-3M3 17v3a1 1 0 0 0 1 1h3M21 17v3a1 1 0 0 1-1 1h-3" />
           <path d="M7 12h10" />
@@ -239,7 +244,7 @@ onMounted(async () => {
       <p v-else-if="error" class="hint error">{{ error }}</p>
 
       <ul v-else class="order-list">
-        <li v-for="item in deliveryItems" :key="item.id" class="order-card">
+        <li v-for="item in filteredDeliveryItems" :key="item.id" class="order-card">
           <div class="order-top">
             <div class="order-thumb">
               <img v-if="deliveryThumb(item)" :src="deliveryThumb(item)" alt="" @error="onThumbError(item.id)" />
@@ -272,39 +277,35 @@ onMounted(async () => {
           </div>
 
           <div class="order-actions">
-            <a class="action-item" :href="deliveryMapUrl(item)" target="_blank" rel="noopener">
+            <a class="action-item" :href="deliveryMapUrl(item)" target="_blank" rel="noopener" aria-label="Map">
               <span class="action-icon map">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.5" />
                 </svg>
               </span>
-              <span>Map</span>
             </a>
-            <a class="action-item" :href="`tel:${deliveryPhone(item)}`">
+            <a class="action-item" :href="`tel:${deliveryPhone(item)}`" aria-label="Call">
               <span class="action-icon call">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2Z" />
                 </svg>
               </span>
-              <span>Call</span>
             </a>
-            <a class="action-item" href="#" @click.prevent>
+            <a class="action-item" href="#" @click.prevent aria-label="Message">
               <span class="action-icon message">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20l1.3-3.9a8.4 8.4 0 0 1-1.2-4.4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z" />
                 </svg>
               </span>
-              <span>Message</span>
             </a>
           </div>
         </li>
       </ul>
       <p v-if="!loading && !error && !deliveryItems.length" class="empty-hint">No deliveries right now.</p>
+      <p v-else-if="!loading && !error && !filteredDeliveryItems.length" class="empty-hint">No deliveries match that phone number.</p>
     </main>
 
     <p v-if="scanMessage" class="scan-toast" :class="scanMessageType">{{ scanMessage }}</p>
-
-    <QrCodeCard v-if="showQr" :profile="profile" @close="showQr = false" />
 
     <ScanQRCodeModal
       v-if="showScan"
@@ -319,11 +320,16 @@ onMounted(async () => {
 <style scoped>
 .page-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
   padding: 24px 20px 90px;
   background: var(--green);
   border-radius: 0 0 32px 32px;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .header-brand {
   display: flex;
@@ -411,6 +417,35 @@ onMounted(async () => {
   height: 88px;
 }
 
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.search-bar svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 16px var(--sans); /* iOS Safari auto-zooms on focus if an input's font-size is under 16px */
+}
+.search-bar input::placeholder {
+  color: var(--muted);
+}
 .scan-btn {
   display: flex;
   align-items: center;

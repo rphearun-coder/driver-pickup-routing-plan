@@ -1,36 +1,32 @@
 import mqtt, { type MqttClient } from 'mqtt';
 import type { ConnectionStatus, DriverLocation } from '../types';
 
-const DRIVER_LOCATION_TOPIC_PATTERN = /^\/topic\/driver\/([^/]+)\/location$/;
-const DRIVER_LOCATION_TOPIC_SUFFIX = '/location';
 // retain: true — lets the broker hand a fresh subscriber (e.g. a page refresh, or the
 // public tracking link opening for the first time) the driver's last known position
 // immediately, instead of leaving the map blank until the next live publish.
 const MQTT_PUBLISH_OPTIONS = { qos: 0 as const, retain: true };
 
-function topicForDriver(driverId: string): string {
-  return `/topic/driver/${driverId}${DRIVER_LOCATION_TOPIC_SUFFIX}`;
-}
-
-function driverIdFromTopic(topic: string): string | null {
-  const match = topic.match(DRIVER_LOCATION_TOPIC_PATTERN);
-  return match ? match[1] : null;
-}
+export const mqttDriverLocationBroadcastTopic = (driverId: string) => `/topic/driver/${driverId}/location`;
 
 export interface ConnectDriverMqttOptions {
   url: string;
   username?: string;
   password?: string;
-  subscribeTopic?: string;
   onStatusChange?: (status: ConnectionStatus) => void;
   onLocation?: (data: DriverLocation) => void;
 }
+
+// Ref-counted (not a plain Set) so two callers tracking the same driver don't have one's
+// unsubscribe kill the topic out from under the other. Module-level because the MQTT
+// client below is a singleton — subscriptions live and die with that one connection,
+// not with any single useDriverLocations() call site.
+const driverTopicRefCounts = new Map<string, number>();
+let sharedClient: MqttClient | null = null;
 
 export function connectDriverMqtt({
   url,
   username,
   password,
-  subscribeTopic = '/topic/driver/+/location',
   onStatusChange,
   onLocation,
 }: ConnectDriverMqttOptions): MqttClient {
@@ -42,12 +38,18 @@ export function connectDriverMqtt({
     keepalive: 10,
     clean: true,
   });
+  sharedClient = client;
 
   client.on('connect', () => {
     onStatusChange?.('connected');
-    client.subscribe(subscribeTopic, (err) => {
-      if (err) console.error('Subscribe failed:', err);
-    });
+    // clean:true means the broker forgets every subscription on disconnect, so a network
+    // blip silently stops live updates unless we resubscribe to what's still wanted.
+    const topics = [...driverTopicRefCounts.keys()];
+    if (topics.length) {
+      client.subscribe(topics, (err) => {
+        if (err) console.error('Resubscribe failed:', err);
+      });
+    }
   });
 
   client.on('reconnect', () => onStatusChange?.('connecting'));
@@ -57,10 +59,10 @@ export function connectDriverMqtt({
     onStatusChange?.('error');
   });
 
-  client.on('message', (topic, payloadBuffer) => {
+  client.on('message', (_topic, payloadBuffer) => {
     try {
       const data = JSON.parse(payloadBuffer.toString());
-      const driverId = data.driverId ?? driverIdFromTopic(topic);
+      const driverId = data.driverId;
       if (!driverId) return;
       onLocation?.({ ...data, driverId });
     } catch (err) {
@@ -69,6 +71,33 @@ export function connectDriverMqtt({
   });
 
   return client;
+}
+
+// Subscribes to just this one driver's broadcast topic instead of the old wildcard
+// (/topic/driver/+/location), which handed every active driver's live position to
+// anyone connected — including an anonymous visitor on the public tracking page.
+export function subscribeDriverTopic(driverId: string): void {
+  if (!sharedClient || !driverId) return;
+  const topic = mqttDriverLocationBroadcastTopic(driverId);
+  const count = driverTopicRefCounts.get(topic) ?? 0;
+  driverTopicRefCounts.set(topic, count + 1);
+  if (count > 0) return; // already subscribed on behalf of another caller
+
+  sharedClient.subscribe(topic, (err) => {
+    if (err) console.error('Subscribe failed:', err);
+  });
+}
+
+export function unsubscribeDriverTopic(driverId: string): void {
+  if (!sharedClient || !driverId) return;
+  const topic = mqttDriverLocationBroadcastTopic(driverId);
+  const count = driverTopicRefCounts.get(topic) ?? 0;
+  if (count <= 1) {
+    driverTopicRefCounts.delete(topic);
+    sharedClient.unsubscribe(topic);
+  } else {
+    driverTopicRefCounts.set(topic, count - 1);
+  }
 }
 
 export interface PublishDriverLocationOptions {
@@ -113,5 +142,5 @@ export function publishDriverLocation(
     driverShift,
     shiftType,
   };
-  client.publish(topicForDriver(driverId), JSON.stringify(payload), MQTT_PUBLISH_OPTIONS);
+  client.publish('/topic/driver/location', JSON.stringify(payload), MQTT_PUBLISH_OPTIONS);
 }
