@@ -81,30 +81,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="qr-scan-sheet">
-    <header class="qr-scan-header">
-      <button type="button" class="qr-cancel" @click="close">Cancel</button>
-      <h2>{{ title }}</h2>
-      <span class="qr-header-spacer" aria-hidden="true"></span>
-    </header>
+  <Teleport to="#overlay-root">
+    <div class="qr-scan-sheet">
+      <header class="qr-scan-header">
+        <button type="button" class="qr-cancel" @click="close">Cancel</button>
+        <h2>{{ title }}</h2>
+        <span class="qr-header-spacer" aria-hidden="true"></span>
+      </header>
 
-    <div class="qr-scan-body">
-      <video ref="videoEl" class="qr-video" playsinline muted></video>
+      <div class="qr-scan-body">
+        <video ref="videoEl" class="qr-video" playsinline muted></video>
 
-      <div class="qr-scan-overlay">
-        <p class="qr-hint" :class="{ error: scanError }">{{ scanError || hint }}</p>
-        <div class="qr-frame">
-          <span class="qr-corner tl"></span>
-          <span class="qr-corner tr"></span>
-          <span class="qr-corner bl"></span>
-          <span class="qr-corner br"></span>
+        <div class="qr-scan-overlay">
+          <p class="qr-hint" :class="{ error: scanError }">{{ scanError || hint }}</p>
+          <div class="qr-frame">
+            <span class="qr-corner tl"></span>
+            <span class="qr-corner tr"></span>
+            <span class="qr-corner bl"></span>
+            <span class="qr-corner br"></span>
+          </div>
+          <button type="button" class="qr-upload-btn" @click="triggerUpload">Upload from photos</button>
         </div>
-        <button type="button" class="qr-upload-btn" @click="triggerUpload">Upload from photos</button>
       </div>
-    </div>
 
-    <input ref="fileInput" type="file" accept="image/*" class="qr-file-input" @change="onFileChosen" />
-  </div>
+      <input ref="fileInput" type="file" accept="image/*" class="qr-file-input" @change="onFileChosen" />
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

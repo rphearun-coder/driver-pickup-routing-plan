@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import type { PickupOrderItem } from '../types/api';
-import type { Parcel } from '../api/parcels';
+import type { ReturnParcel } from '../api/parcels';
 
 // Neither getOrderListByUser nor getDeliveryList/driverListReturnParcel has a
 // "get one by id" counterpart on the backend, so detail pages can't refetch by
@@ -9,13 +9,14 @@ import type { Parcel } from '../api/parcels';
 export const useOrderDetailStore = defineStore('orderDetail', {
   state: () => ({
     order: null as PickupOrderItem | null,
-    parcel: null as Parcel | null,
+    // ReturnParcel = Parcel plus optional return fields, so any Parcel fits.
+    parcel: null as ReturnParcel | null,
   }),
   actions: {
     setOrder(order: PickupOrderItem) {
       this.order = order;
     },
-    setParcel(parcel: Parcel) {
+    setParcel(parcel: ReturnParcel) {
       this.parcel = parcel;
     },
   },

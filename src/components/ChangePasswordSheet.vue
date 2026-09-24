@@ -41,27 +41,29 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="sheet-backdrop" @click.self="emit('close')">
-    <div class="sheet">
-      <span class="drag-handle"></span>
-      <h2 class="sheet-title">Change Password</h2>
+  <Teleport to="#overlay-root">
+    <div class="sheet-backdrop" @click.self="emit('close')">
+      <div class="sheet">
+        <span class="drag-handle"></span>
+        <h2 class="sheet-title">Change Password</h2>
 
-      <label class="field-label" for="change-pw-current">Current password</label>
-      <input id="change-pw-current" v-model="currentPassword" type="password" class="text-input" placeholder="Current password" autocomplete="current-password" />
+        <label class="field-label" for="change-pw-current">Current password</label>
+        <input id="change-pw-current" v-model="currentPassword" type="password" class="text-input" placeholder="Current password" autocomplete="current-password" />
 
-      <label class="field-label" for="change-pw-new">New password</label>
-      <input id="change-pw-new" v-model="newPassword" type="password" class="text-input" placeholder="New password" autocomplete="new-password" />
+        <label class="field-label" for="change-pw-new">New password</label>
+        <input id="change-pw-new" v-model="newPassword" type="password" class="text-input" placeholder="New password" autocomplete="new-password" />
 
-      <label class="field-label" for="change-pw-confirm">Confirm new password</label>
-      <input id="change-pw-confirm" v-model="confirmPassword" type="password" class="text-input" placeholder="Confirm new password" autocomplete="new-password" />
+        <label class="field-label" for="change-pw-confirm">Confirm new password</label>
+        <input id="change-pw-confirm" v-model="confirmPassword" type="password" class="text-input" placeholder="Confirm new password" autocomplete="new-password" />
 
-      <p v-if="error" class="error-text">{{ error }}</p>
+        <p v-if="error" class="error-text">{{ error }}</p>
 
-      <button type="button" class="confirm-btn" :disabled="!canSubmit" @click="onSubmit">
-        {{ saving ? 'Saving...' : 'Change Password' }}
-      </button>
+        <button type="button" class="confirm-btn" :disabled="!canSubmit" @click="onSubmit">
+          {{ saving ? 'Saving...' : 'Change Password' }}
+        </button>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -79,7 +81,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 90%;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px 20px 24px;
@@ -125,7 +127,7 @@ onUnmounted(() => {
 }
 .error-text {
   margin-top: 12px;
-  color: #e33;
+  color: var(--red);
   font-size: 0.8rem;
   text-align: center;
 }

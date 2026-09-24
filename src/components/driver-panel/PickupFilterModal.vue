@@ -5,7 +5,7 @@
       <IconChevronDown class="chevron" />
     </button>
 
-    <Teleport to="body">
+    <Teleport to="#overlay-root">
       <div v-if="open" class="pickup-filter-backdrop" @click.self="close">
         <div class="pickup-filter-modal" role="dialog" aria-modal="true" aria-label="Filter pickups">
           <div class="pickup-filter-modal-header">

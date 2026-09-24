@@ -167,7 +167,7 @@ async function onSubmit() {
   cursor: not-allowed;
 }
 .error {
-  color: #e33;
+  color: var(--red);
   font-size: 0.8rem;
   margin: 0;
 }

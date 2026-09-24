@@ -7,8 +7,6 @@ export const GPS_WEAK_ACCURACY_METERS = 50;
 export const GPS_MAX_PUBLISH_ACCURACY_METERS = 200;
 // No new fix for this long while tracking means the signal has gone quiet.
 export const GPS_STALE_AFTER_MS = 30_000;
-// A fix whose own timestamp is older than this is a cached reading, not the latest GPS.
-export const GPS_MAX_FIX_AGE_MS = 60_000;
 
 export interface GpsStatusInput {
   /** Live mode + online + signed in — i.e. location is supposed to be flowing. */
@@ -29,9 +27,6 @@ export function computeGpsStatus({ tracking, blocked, lastFixAt, accuracyMeters,
   return 'good';
 }
 
-export function isFixFresh(fixAt: number, now: number): boolean {
-  return Number.isFinite(fixAt) && now - fixAt <= GPS_MAX_FIX_AGE_MS;
-}
 
 export function isAccurateEnoughToPublish(accuracyMeters: number): boolean {
   return Number.isFinite(accuracyMeters) && accuracyMeters <= GPS_MAX_PUBLISH_ACCURACY_METERS;

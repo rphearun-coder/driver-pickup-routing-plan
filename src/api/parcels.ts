@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { postGraphQL } from '../lib/graphql-request';
 import { uploadImageToFolder } from '../lib/upload-request';
+import type { RouteSortParams } from '../utils/geo';
 
 // Jalat Order Service — see Jalat-Order-Service/src/graphql/parcel/parcel.resolver.ts.
 // Both return parcels ("driverListReturnParcel", @Auth('DRIVER')) and the driver's
@@ -65,16 +66,28 @@ export type ReceiverBy = 'DRIVER' | 'SELLER';
 export interface Parcel {
   id: string;
   orderId: string;
+  parcelUID?: string;
   status: ParcelStatus;
   onRoute?: boolean;
   recipientName?: string;
   recipientNumber?: string;
   partnerStoreName?: string;
-  partner?: { fullName?: string; shop?: { shopName?: string } };
+  // The seller. Phone + shop address/coords are what a driver needs when
+  // carrying a return back to the shop.
+  partner?: {
+    fullName?: string;
+    phoneNumber?: string;
+    shop?: { shopName?: string; shopImage?: string; address?: string; latitude?: number; longitude?: number };
+  };
   location?: string;
   deliveryAddress?: string;
   deliveryLatitude?: number;
   deliveryLongitude?: number;
+  // Straight-line estimate from the driver's last location (getDeliveryList, ON_DELIVERY only).
+  estimatedDistanceMeters?: number;
+  estimatedDurationSeconds?: number;
+  estimatedDistanceMetersText?: string;
+  estimatedDurationSecondsText?: string;
   parcelImage?: string;
   receiptImage?: string;
   proofImage?: string;
@@ -92,21 +105,33 @@ export interface Parcel {
 export interface ParcelListResult {
   results: Parcel[];
   metadata: { total: number; limit: number; offset: number };
+  // Route totals (getDeliveryList for a driver's ON_DELIVERY list).
+  extraData?: {
+    totalEstimatedDistanceMeters?: number;
+    totalEstimatedDurationSeconds?: number;
+    totalEstimatedDistanceMetersText?: string;
+    totalEstimatedDurationSecondsText?: string;
+  };
 }
 
 const PARCEL_FIELDS = `
   id
   orderId
+  parcelUID
   status
   onRoute
   recipientName
   recipientNumber
   partnerStoreName
-  partner { fullName shop { shopName } }
+  partner { fullName phoneNumber shop { shopName shopImage address latitude longitude } }
   location
   deliveryAddress
   deliveryLatitude
   deliveryLongitude
+  estimatedDistanceMeters
+  estimatedDurationSeconds
+  estimatedDistanceMetersText
+  estimatedDurationSecondsText
   parcelImage
   receiptImage
   proofImage
@@ -144,7 +169,8 @@ export function driverListReturnParcel(
   }).then((data) => data.driverListReturnParcel);
 }
 
-export interface DeliveryListFilter {
+// routeSort / originLat / originLon: the Order Service sorts (see utils/geo.ts RouteSortParams).
+export interface DeliveryListFilter extends RouteSortParams {
   status?: ParcelStatus[];
   recipientNumber?: string;
   startAt?: string;
@@ -156,6 +182,12 @@ const GET_DELIVERY_LIST_QUERY = `
     getDeliveryList(filter: $filter, limit: $limit, offset: $offset) {
       results { ${PARCEL_FIELDS} }
       metadata { total limit offset }
+      extraData {
+        totalEstimatedDistanceMeters
+        totalEstimatedDurationSeconds
+        totalEstimatedDistanceMetersText
+        totalEstimatedDurationSecondsText
+      }
     }
   }
 `;
@@ -181,6 +213,35 @@ const SCAN_QR_CODE_MUTATION = `
 // to this driver and moves it to ON_DELIVERY, ready to hand to the customer.
 export function scanParcelQrCode(id: string) {
   return queryOrders<{ scanQRCode: Parcel }>(SCAN_QR_CODE_MUTATION, { id }).then((data) => data.scanQRCode);
+}
+
+const UPDATE_PARCEL_ON_ROUTE_MUTATION = `
+  mutation UpdateParcelOnRoute($parcelId: String!, $onRoute: Boolean!) {
+    updateParcelOnRoute(parcelId: $parcelId, onRoute: $onRoute)
+  }
+`;
+
+// Marks one of this driver's ON_DELIVERY parcels as en route (heading to the
+// customer) or not. Stored server-side and read back through the parcel's
+// resolved onRoute field (see parcel.service.ts updateParcelOnRoute).
+export function updateParcelOnRoute(parcelId: string, onRoute: boolean): Promise<boolean> {
+  return queryOrders<{ updateParcelOnRoute: boolean }>(UPDATE_PARCEL_ON_ROUTE_MUTATION, { parcelId, onRoute }).then(
+    (data) => data.updateParcelOnRoute,
+  );
+}
+
+const UPDATE_PARCEL_IMAGE_MUTATION = `
+  mutation UpdateParcelImage($id: String!, $parcelImage: String!) {
+    updateParcelImage(id: $id, parcelImage: $parcelImage)
+  }
+`;
+
+// Replaces the parcel photo — only for this driver's ON_DELIVERY parcels (see
+// parcel.service.ts updateParcelImage). parcelImage is a bare OBS key.
+export function updateParcelImage(id: string, parcelImage: string): Promise<boolean> {
+  return queryOrders<{ updateParcelImage: boolean }>(UPDATE_PARCEL_IMAGE_MUTATION, { id, parcelImage }).then(
+    (data) => data.updateParcelImage,
+  );
 }
 
 const CONFIRM_RETURN_FROM_WAREHOUSE_MUTATION = `
@@ -215,14 +276,27 @@ export interface FinishDeliveryOptions {
   receiptImage?: string;
   amountUSD?: number;
   amountKHR?: number;
+  // The recipient handed a parcel back to return to the seller (exchange etc.) —
+  // the backend flags the parcel hasReturn and notes "មានឥវ៉ាន់ត្រលប់".
+  isReturn?: boolean;
+  proofOfReturnFromReceiver?: string;
 }
 
 // Requires the parcel to already be ON_DELIVERY and belong to this driver (see
 // parcel.service.ts finishDelivery).
 export function finishParcelDelivery(options: FinishDeliveryOptions): Promise<Parcel> {
-  const { id, receiverBy, proofImage, receiptImage, amountUSD, amountKHR } = options;
+  const { id, receiverBy, proofImage, receiptImage, amountUSD, amountKHR, isReturn, proofOfReturnFromReceiver } = options;
   return queryOrders<{ finishDelivery: Parcel }>(FINISH_DELIVERY_MUTATION, {
-    input: { id, receiverBy, proofImage, receiptImage, amountUSD: amountUSD || 0, amountKHR: amountKHR || 0 },
+    input: {
+      id,
+      receiverBy,
+      proofImage,
+      receiptImage,
+      amountUSD: amountUSD || 0,
+      amountKHR: amountKHR || 0,
+      isReturn: !!isReturn,
+      proofOfReturnFromReceiver,
+    },
   }).then((data) => data.finishDelivery);
 }
 
@@ -271,6 +345,62 @@ export function confirmReturnParcel(id: string, proofImage: string): Promise<boo
     id,
     proofImage,
   }).then((data) => data.confirmReturnParcel);
+}
+
+// A Parcel plus the ownership/return fields the shop-returns flow needs.
+export type ReturnParcel = Parcel & {
+  userId?: string;
+  proofOfReturnToSender?: string;
+  // For a RETURN parcel, when it was handed back (confirmReturnParcel sets it).
+  deliveredAt?: string;
+};
+
+const RETURN_PARCEL_FIELDS = `${PARCEL_FIELDS} userId proofOfReturnToSender deliveredAt`;
+
+const GET_BE_RETURN_PARCELS_QUERY = `
+  query GetBeReturnParcels($userId: String) {
+    getBeReturnParcels(userId: $userId) { ${RETURN_PARCEL_FIELDS} }
+  }
+`;
+
+// The driver's BE_RETURN parcels (returnByDriverId = this driver, scoped from the
+// auth token — see parcel.service.ts getBeReturnParcels), optionally narrowed to
+// one seller. Used at a pickup to hand that shop's returns back in the same visit.
+export function getBeReturnParcels(userId?: string): Promise<ReturnParcel[]> {
+  return queryOrders<{ getBeReturnParcels: ReturnParcel[] }>(GET_BE_RETURN_PARCELS_QUERY, {
+    userId,
+  }).then((data) => data.getBeReturnParcels ?? []);
+}
+
+const GET_PARCEL_QUERY = `
+  query GetParcel($id: String!) {
+    getParcel(id: $id) { ${RETURN_PARCEL_FIELDS} }
+  }
+`;
+
+// Any parcel by id (parcel.resolver.ts getParcel, @Auth()) — used to check a scanned
+// return parcel's shop and status before the driver takes it on.
+export function getParcel(id: string): Promise<ReturnParcel> {
+  return queryOrders<{ getParcel: ReturnParcel }>(GET_PARCEL_QUERY, { id }).then((data) => data.getParcel);
+}
+
+const DRIVER_RETURNED_PARCELS_QUERY = `
+  query DriverReturnedParcels($filter: DriverListReturnParcelFilter, $limit: Int, $offset: Int) {
+    driverListReturnParcel(filter: $filter, limit: $limit, offset: $offset) {
+      results { ${RETURN_PARCEL_FIELDS} }
+      metadata { total limit offset }
+    }
+  }
+`;
+
+// Parcels this driver already handed back (status RETURN, see confirmReturnParcel).
+// The backend can't filter by shop, so callers narrow the page by userId themselves.
+export function getDriverReturnedParcels(limit = 100, offset = 0): Promise<ReturnParcel[]> {
+  return queryOrders<{ driverListReturnParcel: { results: ReturnParcel[] } }>(DRIVER_RETURNED_PARCELS_QUERY, {
+    filter: { statusIn: ['RETURN'] },
+    limit,
+    offset,
+  }).then((data) => data.driverListReturnParcel.results ?? []);
 }
 
 const CONFIRM_RETURN_TO_WAREHOUSE_MUTATION = `

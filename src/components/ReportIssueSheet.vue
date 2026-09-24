@@ -70,54 +70,56 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="sheet-backdrop" @click.self="emit('close')">
-    <div class="sheet">
-      <span class="drag-handle"></span>
+  <Teleport to="#overlay-root">
+    <div class="sheet-backdrop" @click.self="emit('close')">
+      <div class="sheet">
+        <span class="drag-handle"></span>
 
-      <template v-if="step === 'help'">
-        <h2 class="sheet-title">Report an Issue</h2>
-        <p class="hint">Request help before you can mark this delivery as failed.</p>
+        <template v-if="step === 'help'">
+          <h2 class="sheet-title">Report an Issue</h2>
+          <p class="hint">Request help before you can mark this delivery as failed.</p>
 
-        <label class="field-label" for="issue-reason">Reason</label>
-        <select id="issue-reason" v-model="reason" class="text-input">
-          <option v-for="option in REASONS" :key="option" :value="option">{{ option }}</option>
-        </select>
+          <label class="field-label" for="issue-reason">Reason</label>
+          <select id="issue-reason" v-model="reason" class="text-input">
+            <option v-for="option in REASONS" :key="option" :value="option">{{ option }}</option>
+          </select>
 
-        <p v-if="error" class="error-text">{{ error }}</p>
+          <p v-if="error" class="error-text">{{ error }}</p>
 
-        <button type="button" class="confirm-btn" :disabled="submitting" @click="onRequestHelp">
-          {{ submitting ? 'Sending...' : 'Request Help' }}
-        </button>
-      </template>
+          <button type="button" class="confirm-btn" :disabled="submitting" @click="onRequestHelp">
+            {{ submitting ? 'Sending...' : 'Request Help' }}
+          </button>
+        </template>
 
-      <template v-else-if="step === 'requested'">
-        <h2 class="sheet-title">Help Requested</h2>
-        <p class="hint">Our team has been notified. Once enough time has passed, you can mark this delivery as failed below.</p>
+        <template v-else-if="step === 'requested'">
+          <h2 class="sheet-title">Help Requested</h2>
+          <p class="hint">Our team has been notified. Once enough time has passed, you can mark this delivery as failed below.</p>
 
-        <p v-if="error" class="error-text">{{ error }}</p>
+          <p v-if="error" class="error-text">{{ error }}</p>
 
-        <button type="button" class="confirm-btn" :disabled="submitting" @click="step = 'fail'">Continue</button>
-      </template>
+          <button type="button" class="confirm-btn" :disabled="submitting" @click="step = 'fail'">Continue</button>
+        </template>
 
-      <template v-else>
-        <h2 class="sheet-title">Mark Delivery as Failed</h2>
+        <template v-else>
+          <h2 class="sheet-title">Mark Delivery as Failed</h2>
 
-        <label class="field-label" for="issue-reason-2">Reason</label>
-        <select id="issue-reason-2" v-model="reason" class="text-input">
-          <option v-for="option in REASONS" :key="option" :value="option">{{ option }}</option>
-        </select>
+          <label class="field-label" for="issue-reason-2">Reason</label>
+          <select id="issue-reason-2" v-model="reason" class="text-input">
+            <option v-for="option in REASONS" :key="option" :value="option">{{ option }}</option>
+          </select>
 
-        <label class="field-label">Proof photo (optional)</label>
-        <PhotoUploadCard :preview-url="proofPreviewUrl" label="Upload photo" @change="onProofFileChange" />
+          <label class="field-label">Proof photo (optional)</label>
+          <PhotoUploadCard :preview-url="proofPreviewUrl" label="Upload photo" @change="onProofFileChange" />
 
-        <p v-if="error" class="error-text">{{ error }}</p>
+          <p v-if="error" class="error-text">{{ error }}</p>
 
-        <button type="button" class="confirm-btn danger" :disabled="submitting" @click="onMarkFailed">
-          {{ submitting ? 'Submitting...' : 'Mark as Failed' }}
-        </button>
-      </template>
+          <button type="button" class="confirm-btn danger" :disabled="submitting" @click="onMarkFailed">
+            {{ submitting ? 'Submitting...' : 'Mark as Failed' }}
+          </button>
+        </template>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -135,7 +137,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 90%;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px 20px 24px;
@@ -184,7 +186,7 @@ onUnmounted(() => {
 }
 .error-text {
   margin-top: 12px;
-  color: #e33;
+  color: var(--red);
   font-size: 0.8rem;
   text-align: center;
 }
@@ -200,7 +202,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .confirm-btn.danger {
-  background: #e0433b;
+  background: var(--red);
 }
 .confirm-btn:disabled {
   background: #a9d9c1;

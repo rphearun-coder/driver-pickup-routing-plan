@@ -1,11 +1,61 @@
+/*
+ * App theme — the one place colours are defined. Components use these tokens,
+ * never raw hex values, so a palette change happens here only.
+ *   <hue>          main colour (buttons, active states, icons)
+ *   <hue>-strong   darker text-on-soft colour
+ *   <hue>-soft     pale background for chips / badges / icon tiles
+ *   <hue>-tint     very pale surface for selected cards and dashed drop zones
+ */
 :root {
+  /* Brand + status */
   --green: #1a9c4b;
+  --green-strong: #1e7a22;
+  --green-soft: #e6f4e7;
+  --green-tint: #f5fbf5;
+  --green-border: #cfe9d0;
+
   --orange: #d98324;
+  --orange-strong: #b26a00;
+  --orange-deep: #92610a;
+  --orange-soft: #fff4e5;
+  --orange-tint: #fff8f1;
+
+  --red: #e0433b;
+  --red-strong: #c62828;
+  --red-deep: #9f1f17;
+  --red-soft: #fdecec;
+  --red-tint: #fff7f7;
+
+  --blue: #1a73e8;
+  --blue-strong: #1a56b8;
+  --blue-soft: #e8f0fe;
+  --blue-border: #c6dafc;
+
+  /* Text */
   --ink: #1f2937;
+  --ink-strong: #111827;
+  --text-2: #374151;
+  --text-3: #4b5563;
   --muted: #6b7280;
-  --line: #e5e7eb;
+  --faint: #9aa3af;
+
+  /* Surfaces */
+  --page: #f6f7f9;
   --wash: #f7f8fa;
   --bg: #f3eee8;
+  --fill: #f1f3f6;
+  --fill-strong: #e9ecf1;
+  --track: #eef0f3;
+  --input: #eef2f8;
+
+  /* Lines */
+  --line: #e5e7eb;
+  --border: #eceff3;
+  --border-strong: #e5e8ed;
+  --divider: #f0f2f5;
+  --border-dashed: #d6dbe3;
+  --disabled: #d1d5db;
+
   --heading: 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --bottom-nav-h: 58px;
@@ -54,6 +104,29 @@ body {
   -webkit-overflow-scrolling: touch;
   background: #f3eee8;
   contain: layout;
+}
+
+/* Popups (sheets, dialogs, lightboxes, toasts) are teleported here, not rendered inside
+   #app: #app scrolls and has `contain: layout`, so a `position: fixed` popup inside it is
+   pinned to the top of the scrolled content and slides out of view once the page is
+   scrolled. This layer mirrors #app's phone frame (same size, centred the same way) but
+   never scrolls; its transform makes it the containing block, so `position: fixed;
+   inset: 0` children cover exactly the visible screen / frame on every device. */
+#overlay-root {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1000;
+  width: 440px;
+  height: 956px;
+  max-width: 100vw;
+  max-height: 100vh;
+  max-height: 100dvh;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+#overlay-root > * {
+  pointer-events: auto;
 }
 
 /* Removes the ~300ms tap delay and disables double-tap-to-zoom on controls —
@@ -531,7 +604,7 @@ svg {
   flex-shrink: 0;
 }
 
-/* PickupFilterModal is teleported to <body>, so it sits outside .driver-panel —
+/* PickupFilterModal is teleported to #overlay-root, so it sits outside .driver-panel —
    these rules are deliberately unscoped and self-contained (no --dp-* var reliance). */
 .pickup-filter-backdrop {
   position: fixed;
@@ -974,5 +1047,52 @@ svg {
     border-radius: 14px;
     background: #157a4b;
     font-size: 14px;
+  }
+}
+
+/*
+ * Horizontal scroll row (filter chips etc.) — pair with the v-scroll-x directive
+ * (src/directives/scrollX.ts) so mouse wheel + drag work, not only touch swipes.
+ * Scrollbar hidden on touch, thin on mouse devices; the right edge fades while
+ * more items are hidden past it.
+ */
+.scroll-row {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}
+.scroll-row > * {
+  flex-shrink: 0;
+}
+.scroll-row.is-scrollable:not(.at-end) {
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.scroll-row.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.scroll-row.is-dragging > * {
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .scroll-row.is-scrollable {
+    padding-bottom: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--disabled) transparent;
+    cursor: grab;
+  }
+  .scroll-row.is-scrollable::-webkit-scrollbar {
+    display: block;
+    height: 4px;
+  }
+  .scroll-row.is-scrollable::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--disabled);
   }
 }

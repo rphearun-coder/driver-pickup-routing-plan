@@ -51,6 +51,24 @@ export const DATE_RANGE_OPTIONS = [
 
 export type DateRangeKey = (typeof DATE_RANGE_OPTIONS)[number]['key'];
 
+// "Thu, Sep 24" for a single day, "Sep 21 – 24" / "Aug 31 – Sep 3" for a span.
+export function rangeDatesText(key: DateRangeKey): string {
+  const option = DATE_RANGE_OPTIONS.find((o) => o.key === key);
+  if (!option) return '';
+  const { startAt, endAt } = option.range();
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (start.toDateString() === end.toDateString()) {
+    return start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  const startText = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const endText =
+    start.getMonth() === end.getMonth()
+      ? String(end.getDate())
+      : end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${startText} – ${endText}`;
+}
+
 export function getDriverDashboard(range: DateRange = todayRange()) {
   return queryOrderService<{ driverDashboard: DriverDashboardSummary }>(
     `query DriverDashboard($startAt: String!, $endAt: String!) {

@@ -280,7 +280,7 @@ function onModeChange(mode: LocationMode): void {
   background: var(--green);
 }
 .permission-badge.denied {
-  background: #e0433b;
+  background: var(--red);
 }
 .permission-badge.prompt {
   background: var(--orange);
@@ -327,7 +327,7 @@ function onModeChange(mode: LocationMode): void {
   font-size: 0.82rem;
 }
 .hint.error {
-  color: #e0433b;
+  color: var(--red);
 }
 .hint.success {
   color: var(--green);
@@ -372,11 +372,11 @@ function onModeChange(mode: LocationMode): void {
   line-height: 1.4;
 }
 .repair-card {
-  border-color: #e0433b;
-  background: #fff6f5;
+  border-color: var(--red);
+  background: var(--red-tint);
 }
 .repair-card .repair-heading {
-  color: #e0433b;
+  color: var(--red);
 }
 .issue-list {
   margin: 0 0 14px;

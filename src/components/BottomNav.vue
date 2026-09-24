@@ -70,7 +70,7 @@
   gap: 4px;
   margin: 0 2px;
   padding: 2px 4px;
-  color: #9aa0a6;
+  color: var(--faint);
   text-decoration: none;
   text-align: center;
 }
@@ -95,20 +95,5 @@
 }
 .nav-item.router-link-exact-active .icon-wrap svg {
   stroke-width: 2.4;
-}
-.badge {
-  position: absolute;
-  top: 0;
-  right: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: #e0433b;
-  color: #fff;
-  font: 700 0.6rem var(--sans);
 }
 </style>
