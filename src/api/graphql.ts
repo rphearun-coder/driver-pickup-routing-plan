@@ -27,17 +27,26 @@ export async function gqlRequest<T>(
   token?: string,
   signal?: AbortSignal
 ): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-platform': 'web',
-      'x-udid': getDeviceId(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ query, variables }),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-platform': 'web',
+        'x-udid': getDeviceId(),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ query, variables }),
+      signal,
+    });
+  } catch (err) {
+    // Aborts are intentional — let callers keep ignoring them by name.
+    if ((err as { name?: string }).name === 'AbortError') throw err;
+    // fetch only rejects when the server is unreachable (down, wrong URL, CORS, offline),
+    // which the browser reports as a bare "Failed to fetch".
+    throw new GraphQLError("Can't reach the server right now. Check your connection and try again.", 'NETWORK_ERROR');
+  }
 
   const payload = await response.json().catch(() => null);
 

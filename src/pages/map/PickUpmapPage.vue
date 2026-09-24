@@ -79,6 +79,7 @@ import LocationModeSwitch from "@/components/LocationModeSwitch.vue";
 import { PICKUP_POLL_INTERVAL_MS } from "@/config";
 import { fetchDriverOrders, updateOrderOnRoute } from "@/api/orders";
 import { todayIso } from "@/utils/date";
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from "@/map/constants";
 import type { LatLng, PickupPoint, PickupTimeSlot } from "@/types";
 
 const DevPublishPanel = shallowRef<any>(null);
@@ -88,8 +89,8 @@ if (import.meta.env.DEV) {
   });
 }
 
-const DEFAULT_CENTER: LatLng = { lat: 11.525480965356625, lng: 104.90954542274423 };
-const DEFAULT_ZOOM = 12;
+const DEFAULT_CENTER: LatLng = DEFAULT_MAP_CENTER;
+const DEFAULT_ZOOM = DEFAULT_MAP_ZOOM;
 const driverMapRef = ref<InstanceType<typeof DriverMap> | null>(null);
 const pickups = ref<PickupPoint[]>([]);
 const selectedPickupDate = ref(todayIso());

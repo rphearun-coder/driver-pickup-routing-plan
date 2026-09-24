@@ -66,6 +66,12 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
+          path: 'pickup-history/:id',
+          name: 'pickup-history-detail',
+          component: () => import('../pages/PickupHistoryDetailPage.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
           path: 'settlement-history',
           name: 'settlement-history',
           component: () => import('../pages/SettlementHistoryPage.vue'),
@@ -75,13 +81,21 @@ const router = createRouter({
           path: 'orders/:id',
           name: 'order-detail',
           component: () => import('../pages/OrderDetailPage.vue'),
-          meta: { requiresAuth: true },
+          // Full-screen like the native app — its own bottom action button takes the nav's place.
+          meta: { requiresAuth: true, hideBottomNav: true },
+        },
+        {
+          path: 'orders/:id/returns',
+          name: 'order-returns',
+          component: () => import('../pages/OrderReturnsPage.vue'),
+          meta: { requiresAuth: true, hideBottomNav: true },
         },
         {
           path: 'parcels/:id',
           name: 'parcel-detail',
           component: () => import('../pages/ParcelDetailPage.vue'),
-          meta: { requiresAuth: true },
+          // Full-screen — delivery parcels have their own Deliver / Failed bottom bar.
+          meta: { requiresAuth: true, hideBottomNav: true },
         },
       ],
     },

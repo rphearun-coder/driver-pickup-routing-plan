@@ -101,43 +101,45 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="sheet-backdrop" @click.self="emit('close')">
-    <div class="sheet">
-      <span class="drag-handle"></span>
-      <h2 class="sheet-title">Edit Profile</h2>
+  <Teleport to="#overlay-root">
+    <div class="sheet-backdrop" @click.self="emit('close')">
+      <div class="sheet">
+        <span class="drag-handle"></span>
+        <h2 class="sheet-title">Edit Profile</h2>
 
-      <p v-if="loading" class="hint">Loading...</p>
-      <template v-else>
-        <div class="avatar-picker">
-          <button type="button" class="avatar-btn" :disabled="avatarUploading" @click="onAvatarPick">
-            <img v-if="avatarPreviewUrl || avatarKey" :src="avatarPreviewUrl || resolveParcelImageUrl(avatarKey)" alt="" />
-            <span v-else class="avatar-fallback" :style="{ background: avatarColor(fullName) }">
-              {{ avatarInitials(fullName) || '?' }}
-            </span>
-            <span v-if="avatarUploading" class="avatar-spinner"></span>
-            <span class="avatar-edit-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 16V4M12 4l-4 4M12 4l4 4" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
-              </svg>
-            </span>
+        <p v-if="loading" class="hint">Loading...</p>
+        <template v-else>
+          <div class="avatar-picker">
+            <button type="button" class="avatar-btn" :disabled="avatarUploading" @click="onAvatarPick">
+              <img v-if="avatarPreviewUrl || avatarKey" :src="avatarPreviewUrl || resolveParcelImageUrl(avatarKey)" alt="" />
+              <span v-else class="avatar-fallback" :style="{ background: avatarColor(fullName) }">
+                {{ avatarInitials(fullName) || '?' }}
+              </span>
+              <span v-if="avatarUploading" class="avatar-spinner"></span>
+              <span class="avatar-edit-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 16V4M12 4l-4 4M12 4l4 4" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+                </svg>
+              </span>
+            </button>
+          </div>
+          <input ref="avatarInput" type="file" accept="image/*" class="avatar-file-input" @change="onAvatarChange" />
+
+          <label class="field-label" for="edit-profile-name">Full name</label>
+          <input id="edit-profile-name" v-model="fullName" type="text" class="text-input" placeholder="Full name" />
+
+          <label class="field-label" for="edit-profile-phone">Phone number</label>
+          <PhoneNumberInput v-model="phoneNumber" />
+
+          <p v-if="error" class="error-text">{{ error }}</p>
+
+          <button type="button" class="confirm-btn" :disabled="saving || avatarUploading" @click="onSubmit">
+            {{ saving ? 'Saving...' : 'Save Changes' }}
           </button>
-        </div>
-        <input ref="avatarInput" type="file" accept="image/*" class="avatar-file-input" @change="onAvatarChange" />
-
-        <label class="field-label" for="edit-profile-name">Full name</label>
-        <input id="edit-profile-name" v-model="fullName" type="text" class="text-input" placeholder="Full name" />
-
-        <label class="field-label" for="edit-profile-phone">Phone number</label>
-        <PhoneNumberInput v-model="phoneNumber" />
-
-        <p v-if="error" class="error-text">{{ error }}</p>
-
-        <button type="button" class="confirm-btn" :disabled="saving || avatarUploading" @click="onSubmit">
-          {{ saving ? 'Saving...' : 'Save Changes' }}
-        </button>
-      </template>
+        </template>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -155,7 +157,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 90%;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px 20px 24px;
@@ -291,7 +293,7 @@ onUnmounted(() => {
 }
 .error-text {
   margin-top: 12px;
-  color: #e33;
+  color: var(--red);
   font-size: 0.8rem;
   text-align: center;
 }

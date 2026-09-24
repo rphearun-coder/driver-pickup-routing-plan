@@ -214,7 +214,9 @@ function onLogout() {
       <button type="button" class="logout" @click="onLogout">Log out</button>
     </main>
 
-    <p v-if="toastMessage" class="toast">{{ toastMessage }}</p>
+    <Teleport to="#overlay-root">
+      <p v-if="toastMessage" class="toast">{{ toastMessage }}</p>
+    </Teleport>
 
     <EditProfileSheet v-if="showEditProfile" @close="showEditProfile = false" @saved="onProfileSaved" />
     <ChangePasswordSheet v-if="showChangePassword" @close="showChangePassword = false" @changed="onPasswordChanged" />
@@ -351,7 +353,7 @@ function onLogout() {
 }
 .presence-error {
   margin: 6px 0 0;
-  color: #e33;
+  color: var(--red);
   font: 600 0.75rem var(--sans);
 }
 .presence-badge {
@@ -449,7 +451,7 @@ function onLogout() {
   color: var(--green);
 }
 .status-badge.offline {
-  color: #e33;
+  color: var(--red);
 }
 .logout {
   display: block;

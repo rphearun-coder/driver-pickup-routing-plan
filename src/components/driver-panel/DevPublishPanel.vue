@@ -4,39 +4,41 @@
       <IconTools class="icon" />
     </button>
 
-    <div v-if="open" class="dev-modal-backdrop" @click.self="open = false">
-      <form class="dev-publish-form" @submit.prevent="submit">
-        <div class="dev-modal-header">
-          <span>Dev tools</span>
-          <button type="button" class="dev-modal-close" title="Close" @click="open = false">&times;</button>
-        </div>
+    <Teleport to="#overlay-root">
+      <div v-if="open" class="dev-modal-backdrop" @click.self="open = false">
+        <form class="dev-publish-form" @submit.prevent="submit">
+          <div class="dev-modal-header">
+            <span>Dev tools</span>
+            <button type="button" class="dev-modal-close" title="Close" @click="open = false">&times;</button>
+          </div>
 
-        <label class="dev-field">
-          <span>Driver ID</span>
-          <input v-model="driverId" type="text" placeholder="e.g. driver-42" />
-        </label>
-        <div class="dev-row">
           <label class="dev-field">
-            <span>Lat</span>
-            <input v-model.number="lat" type="number" step="any" required />
+            <span>Driver ID</span>
+            <input v-model="driverId" type="text" placeholder="e.g. driver-42" />
           </label>
-          <label class="dev-field">
-            <span>Lon</span>
-            <input v-model.number="lon" type="number" step="any" required />
-          </label>
-        </div>
-        <button type="submit" class="dev-publish-btn" :disabled="!driverId.trim()">Publish</button>
+          <div class="dev-row">
+            <label class="dev-field">
+              <span>Lat</span>
+              <input v-model.number="lat" type="number" step="any" required />
+            </label>
+            <label class="dev-field">
+              <span>Lon</span>
+              <input v-model.number="lon" type="number" step="any" required />
+            </label>
+          </div>
+          <button type="submit" class="dev-publish-btn" :disabled="!driverId.trim()">Publish</button>
 
-        <label class="dev-field dev-field-speed">
-          <span>Drive speed</span>
-          <select v-model.number="driveSpeedMs" @change="$emit('set-drive-speed', driveSpeedMs)">
-            <option :value="2000">Slow</option>
-            <option :value="1000">Normal</option>
-            <option :value="400">Fast</option>
-          </select>
-        </label>
-      </form>
-    </div>
+          <label class="dev-field dev-field-speed">
+            <span>Drive speed</span>
+            <select v-model.number="driveSpeedMs" @change="$emit('set-drive-speed', driveSpeedMs)">
+              <option :value="2000">Slow</option>
+              <option :value="1000">Normal</option>
+              <option :value="400">Fast</option>
+            </select>
+          </label>
+        </form>
+      </div>
+    </Teleport>
   </span>
 </template>
 
@@ -87,10 +89,10 @@ function submit(): void {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
-  color: #374151;
+  color: var(--text-2);
   cursor: pointer;
 }
 .dev-publish-toggle:hover {
@@ -145,34 +147,34 @@ function submit(): void {
   min-width: 0;
   font-size: 10px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--muted);
 }
 .dev-field input {
   box-sizing: border-box;
   width: 100%;
   padding: 5px 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--disabled);
   border-radius: 5px;
   font-size: 12px;
   font-family: inherit;
   background: #fff;
-  color: #111827;
+  color: var(--ink-strong);
 }
 .dev-field input:focus,
 .dev-field select:focus {
   outline: none;
-  border-color: #1a73e8;
+  border-color: var(--blue);
 }
 .dev-field select {
   box-sizing: border-box;
   width: 100%;
   padding: 5px 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--disabled);
   border-radius: 5px;
   font-size: 12px;
   font-family: inherit;
   background: #fff;
-  color: #111827;
+  color: var(--ink-strong);
 }
 .dev-field-speed {
   padding-top: 6px;
@@ -186,7 +188,7 @@ function submit(): void {
   min-height: 26px;
   border: none;
   border-radius: 6px;
-  background: #1a73e8;
+  background: var(--blue);
   color: #fff;
   font-weight: 700;
   font-size: 11px;
@@ -196,8 +198,8 @@ function submit(): void {
   background: #1558b0;
 }
 .dev-publish-btn:disabled {
-  background: #e5e7eb;
-  color: #9ca3af;
+  background: var(--line);
+  color: var(--faint);
   cursor: not-allowed;
 }
 </style>

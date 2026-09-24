@@ -84,6 +84,7 @@ export interface PickupOrderParcel {
   id: string;
   parcelUID?: string;
   status: string;
+  parcelImage?: string;
 }
 
 export interface PickupOrderItem {
@@ -92,6 +93,7 @@ export interface PickupOrderItem {
   status: PickupOrderStatus;
   onRoute?: boolean;
   estimatedTotalParcel?: number;
+  estimatedTotalPrice?: number;
   pickupAddress?: string;
   pickupLatitude?: number;
   pickupLongitude?: number;

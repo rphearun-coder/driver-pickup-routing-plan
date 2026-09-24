@@ -68,35 +68,37 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="qr-backdrop" @click.self="emit('close')">
-    <div class="qr-card">
-      <button type="button" class="close" aria-label="Close" @click="emit('close')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-        <span>Close</span>
-      </button>
-
-      <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR code" class="qr-image" />
-
-      <div class="actions">
-        <button type="button" class="share-btn" @click="onShare">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-            <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+  <Teleport to="#overlay-root">
+    <div class="qr-backdrop" @click.self="emit('close')">
+      <div class="qr-card">
+        <button type="button" class="close" aria-label="Close" @click="emit('close')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 6l12 12M18 6L6 18" />
           </svg>
-          Share
+          <span>Close</span>
         </button>
-        <button type="button" class="copy-btn" @click="onCopy">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
-          </svg>
-          {{ copied ? 'Copied!' : 'Copy' }}
-        </button>
+
+        <img v-if="qrDataUrl" :src="qrDataUrl" alt="QR code" class="qr-image" />
+
+        <div class="actions">
+          <button type="button" class="share-btn" @click="onShare">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+            </svg>
+            Share
+          </button>
+          <button type="button" class="copy-btn" @click="onCopy">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
+            </svg>
+            {{ copied ? 'Copied!' : 'Copy' }}
+          </button>
+        </div>
+        <p v-if="shareStatus" class="share-status">{{ shareStatus }}</p>
       </div>
-      <p v-if="shareStatus" class="share-status">{{ shareStatus }}</p>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -115,7 +117,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 320px;
-  max-height: 85vh;
+  max-height: 85%;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 44px 20px 20px;
