@@ -186,27 +186,22 @@ const progress = computed(() => {
   return total ? Math.min(100, Math.round((done / total) * 100)) : 0;
 });
 
-function isWithinRange(dateStr: string | undefined, startAt: string, endAt: string): boolean {
-  if (!dateStr) return false;
-  const time = new Date(dateStr).getTime();
-  return time >= new Date(startAt).getTime() && time <= new Date(endAt).getTime();
-}
-
-// No status filter needed — getDeliveryList defaults to ON_DELIVERY server-side
-// (see Jalat-Order-Service/src/graphql/parcel/parcel.service.ts), which is
-// exactly "the driver's current deliveries". Scoped to the selected range
-// client-side by createdAt: the backend's own startAt/endAt filter only checks
-// deliveredAt (see parcel.repository.ts $findAndCountAll), which is null on
-// every not-yet-delivered ON_DELIVERY parcel — sending it there would zero out
-// every active delivery, regardless of the date range.
+// The selected date range is sent to the server as part of the parcel filter.
+// We should not apply a second client-side createdAt filter here because the
+// server is the source of truth for the live ON_DELIVERY list and extra
+// re-filtering can silently hide valid parcels with missing or out-of-sync dates.
 async function loadDeliveries(): Promise<void> {
   loading.value = true;
   error.value = '';
   try {
     const { startAt, endAt } = DATE_RANGE_OPTIONS.find((option) => option.key === selectedRangeKey.value)?.range() ?? todayRange();
-    const data = await getDeliveryList(routeSort.params());
+    const data = await getDeliveryList({
+      ...routeSort.params(),
+      startAt,
+      endAt,
+    });
     routeExtra.value = data.extraData;
-    deliveryItems.value = data.results.filter((item) => isWithinRange(item.createdAt, startAt, endAt));
+    deliveryItems.value = Array.isArray(data.results) ? data.results : [];
   } catch (err: any) {
     error.value = err.message ?? 'Failed to load deliveries';
   } finally {

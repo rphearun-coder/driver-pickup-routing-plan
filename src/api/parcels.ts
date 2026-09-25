@@ -83,6 +83,20 @@ export interface Parcel {
   deliveryAddress?: string;
   deliveryLatitude?: number;
   deliveryLongitude?: number;
+  recipientLocation?: {
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    googleMapLink?: string;
+    lastDeliveredLocation?: string;
+  };
+  recipientLocations?: Array<{
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    googleMapLink?: string;
+    lastDeliveredLocation?: string;
+  }>;
   // Straight-line estimate from the driver's last location (getDeliveryList, ON_DELIVERY only).
   estimatedDistanceMeters?: number;
   estimatedDurationSeconds?: number;
@@ -128,6 +142,7 @@ const PARCEL_FIELDS = `
   deliveryAddress
   deliveryLatitude
   deliveryLongitude
+  recipientLocation { address latitude longitude googleMapLink lastDeliveredLocation }
   estimatedDistanceMeters
   estimatedDurationSeconds
   estimatedDistanceMetersText
