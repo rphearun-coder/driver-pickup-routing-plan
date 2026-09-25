@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import CloseButton from './CloseButton.vue';
 import { MAX_PARCELS, MAX_USD, amountError, countError, parseAmount, sanitizeDecimal, sanitizeInteger } from '../utils/inputRules';
 
 const props = withDefaults(
@@ -72,11 +73,7 @@ onUnmounted(() => (document.body.style.overflow = previousBodyOverflow));
             <h2 class="sheet-title">Enter Information</h2>
             <p class="sheet-subtitle">How many parcels are you picking up?</p>
           </div>
-          <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
+          <CloseButton @click="emit('close')" />
         </div>
 
         <div class="segmented" role="radiogroup" aria-label="Sticker">
@@ -197,24 +194,6 @@ onUnmounted(() => (document.body.style.overflow = previousBodyOverflow));
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
-}
-.close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--text-3);
-  cursor: pointer;
-}
-.close-btn svg {
-  width: 16px;
-  height: 16px;
 }
 .segmented {
   display: grid;

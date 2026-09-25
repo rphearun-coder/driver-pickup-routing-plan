@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import SwipeToConfirm from './SwipeToConfirm.vue';
 import ImageLightbox from './ImageLightbox.vue';
+import CloseButton from './CloseButton.vue';
+import CopyButton from './CopyButton.vue';
 import {
   getCodPaymentAccount,
   submitCodSettlement,
@@ -23,9 +25,7 @@ const fileError = ref('');
 const note = ref('');
 const submitting = ref(false);
 const error = ref('');
-const copied = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
-let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 function usd(amount?: number): string {
   return `$${(amount ?? 0).toFixed(2)}`;
@@ -39,8 +39,6 @@ const canSubmit = computed(() => !!file.value && !submitting.value && !!props.se
 const account = ref<CodPaymentAccount | null>(null);
 const accountLoading = ref(true);
 const qrOpen = ref(false);
-const accountCopied = ref(false);
-let accountCopiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Hidden if the image fails to load (e.g. UAT has no QR saved and the server falls back
 // to a default key that isn't in the bucket) — PayWay and the account number still work.
@@ -60,19 +58,6 @@ async function loadAccount(): Promise<void> {
     account.value = null; // falls back to the plain "transfer from your banking app" text
   } finally {
     accountLoading.value = false;
-  }
-}
-
-async function copyAccount(): Promise<void> {
-  const number = account.value?.accountNumber;
-  if (!number) return;
-  try {
-    await navigator.clipboard.writeText(number.replace(/\s+/g, ''));
-    accountCopied.value = true;
-    clearTimeout(accountCopiedTimer);
-    accountCopiedTimer = setTimeout(() => (accountCopied.value = false), 1800);
-  } catch {
-    // Clipboard blocked — the number is still on screen.
   }
 }
 
@@ -112,17 +97,6 @@ function removeFile(): void {
   file.value = null;
 }
 
-async function copyAmount(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(transferAmount.value.toFixed(2));
-    copied.value = true;
-    clearTimeout(copiedTimer);
-    copiedTimer = setTimeout(() => (copied.value = false), 1800);
-  } catch {
-    // Clipboard blocked (non-HTTPS or permission) — the amount is still on screen.
-  }
-}
-
 async function onSubmit(): Promise<void> {
   if (!file.value || !props.settlement.id) return;
   error.value = '';
@@ -146,8 +120,6 @@ onMounted(() => {
 });
 onUnmounted(() => {
   document.body.style.overflow = previousBodyOverflow;
-  clearTimeout(copiedTimer);
-  clearTimeout(accountCopiedTimer);
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
 });
 </script>
@@ -162,25 +134,13 @@ onUnmounted(() => {
           <div class="head-title">
             <span class="title-icon" aria-hidden="true">$</span>
             <h2 id="settlement-title">Request Settlement</h2>
-            <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
+            <CloseButton @click="emit('close')" />
           </div>
 
           <div class="amount-card">
             <div class="amount-top">
               <span class="amount-label">Money to transfer</span>
-              <button type="button" class="copy-btn" :class="{ done: copied }" @click="copyAmount">
-                <svg v-if="copied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 12.5l4.5 4.5L19 7.5" />
-                </svg>
-                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
-                </svg>
-                {{ copied ? 'Copied' : 'Copy' }}
-              </button>
+              <CopyButton class="copy-btn" :text="transferAmount.toFixed(2)" />
             </div>
             <strong class="amount-value">{{ usd(transferAmount) }}</strong>
             <div class="amount-breakdown">
@@ -223,10 +183,15 @@ onUnmounted(() => {
                 <div class="account-info">
                   <span class="account-hint">{{ qrUrl ? 'Or scan the KHQR with any bank app' : 'Or transfer from any bank app' }}</span>
                   <strong v-if="account?.accountName" class="account-name">{{ account.accountName }}</strong>
-                  <button v-if="account?.accountNumber" type="button" class="account-number" :class="{ done: accountCopied }" @click="copyAccount">
+                  <CopyButton
+                    v-if="account?.accountNumber"
+                    v-slot="{ copied }"
+                    class="account-number"
+                    :text="account.accountNumber.replace(/\s+/g, '')"
+                  >
                     {{ account.accountNumber }}
-                    <span>{{ accountCopied ? 'Copied' : 'Copy' }}</span>
-                  </button>
+                    <span>{{ copied ? 'Copied' : 'Copy' }}</span>
+                  </CopyButton>
                 </div>
               </div>
 
@@ -397,24 +362,6 @@ onUnmounted(() => {
   color: var(--ink);
   font: 800 1.15rem var(--sans);
 }
-.close-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--text-3);
-  cursor: pointer;
-}
-.close-btn svg {
-  width: 15px;
-  height: 15px;
-}
 .amount-card {
   margin-top: 12px;
   padding: 14px 16px;
@@ -446,7 +393,7 @@ onUnmounted(() => {
   font: 700 0.72rem var(--sans);
   cursor: pointer;
 }
-.copy-btn svg {
+.copy-btn :deep(svg) {
   width: 13px;
   height: 13px;
 }

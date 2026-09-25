@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue';
+import CloseButton from './CloseButton.vue';
 import { DATE_RANGE_OPTIONS, rangeDatesText, type DateRangeKey } from '../api/dashboard';
 
 const props = defineProps<{ modelValue: DateRangeKey }>();
@@ -62,11 +63,7 @@ onUnmounted(() => {
                 <h2 id="range-sheet-title" class="sheet-title">Select range</h2>
                 <p class="sheet-sub">Choose the period to show</p>
               </div>
-              <button type="button" class="close-btn" aria-label="Close" @click="close">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-                  <path d="M7 7l10 10M17 7 7 17" />
-                </svg>
-              </button>
+              <CloseButton @click="close" />
             </div>
 
             <ul class="range-options" role="radiogroup" aria-labelledby="range-sheet-title">
@@ -178,24 +175,6 @@ onUnmounted(() => {
   margin: 2px 0 0;
   color: var(--muted);
   font: 500 0.78rem var(--sans);
-}
-.close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--text-3);
-  cursor: pointer;
-}
-.close-btn svg {
-  width: 16px;
-  height: 16px;
 }
 .range-options {
   list-style: none;

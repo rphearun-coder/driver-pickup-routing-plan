@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import SwipeToConfirm from './SwipeToConfirm.vue';
+import CloseButton from './CloseButton.vue';
 import {
   finishParcelDelivery,
   resolveParcelImageUrl,
@@ -150,11 +151,7 @@ onUnmounted(() => {
               </svg>
             </span>
             <h2 id="deliver-title">Delivering Parcel</h2>
-            <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
+            <CloseButton @click="emit('close')" />
           </div>
 
           <div class="parcel-summary">
@@ -474,24 +471,6 @@ onUnmounted(() => {
   margin: 0;
   color: var(--ink);
   font: 800 1.15rem var(--sans);
-}
-.close-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--text-3);
-  cursor: pointer;
-}
-.close-btn svg {
-  width: 15px;
-  height: 15px;
 }
 .parcel-summary {
   display: flex;

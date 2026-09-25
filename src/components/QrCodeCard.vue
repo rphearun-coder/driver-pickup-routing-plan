@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import QRCode from 'qrcode';
 import type { AuthenticatedUser } from '../types/api';
+import CopyButton from './CopyButton.vue';
 
 const props = defineProps<{ profile: AuthenticatedUser | null }>();
 const emit = defineEmits<{ close: [] }>();
 
 const qrDataUrl = ref('');
 const shareStatus = ref('');
-const copied = ref(false);
 
 async function generateQr() {
   const value = props.profile?.id ?? props.profile?.phoneNumber ?? props.profile?.username ?? '';
@@ -43,17 +43,7 @@ async function onShare() {
   }
 }
 
-async function onCopy() {
-  const value = props.profile?.id ?? props.profile?.phoneNumber ?? props.profile?.username ?? '';
-  if (!value) return;
-  try {
-    await navigator.clipboard.writeText(value);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
-  } catch {
-    shareStatus.value = 'Could not copy the ID.';
-  }
-}
+const copyValue = computed(() => props.profile?.id ?? props.profile?.phoneNumber ?? props.profile?.username ?? '');
 
 const previousBodyOverflow = document.body.style.overflow;
 
@@ -88,12 +78,13 @@ onUnmounted(() => {
             </svg>
             Share
           </button>
-          <button type="button" class="copy-btn" @click="onCopy">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
-            </svg>
-            {{ copied ? 'Copied!' : 'Copy' }}
-          </button>
+          <CopyButton
+            class="copy-btn"
+            :text="copyValue"
+            copied-label="Copied!"
+            @copied="shareStatus = ''"
+            @failed="shareStatus = 'Could not copy the ID.'"
+          />
         </div>
         <p v-if="shareStatus" class="share-status">{{ shareStatus }}</p>
       </div>
@@ -181,7 +172,7 @@ onUnmounted(() => {
   border: 1px solid var(--line);
 }
 .share-btn svg,
-.copy-btn svg {
+.copy-btn :deep(svg) {
   width: 12px;
   height: 12px;
 }

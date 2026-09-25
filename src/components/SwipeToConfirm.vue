@@ -14,10 +14,13 @@ const track = ref<HTMLElement | null>(null);
 const offset = ref(0);
 const dragging = ref(false);
 let startX = 0;
-let maxOffset = 0;
+// A ref, not a plain variable: `progress` must recompute once the track is measured.
+// (As a plain `let`, the first render cached progress = 0 forever, so a full swipe
+// snapped back and never emitted `confirm`.)
+const maxOffset = ref(0);
 
 const KNOB = 56;
-const progress = computed(() => (maxOffset ? offset.value / maxOffset : 0));
+const progress = computed(() => (maxOffset.value ? offset.value / maxOffset.value : 0));
 const inactive = computed(() => props.disabled || props.loading);
 
 // Snap back once a submit finishes (success navigates away; failure lets them retry).
@@ -32,20 +35,21 @@ function onPointerDown(event: PointerEvent): void {
   if (inactive.value || !track.value) return;
   dragging.value = true;
   startX = event.clientX - offset.value;
-  maxOffset = track.value.clientWidth - KNOB - 8;
-  (event.target as HTMLElement).setPointerCapture(event.pointerId);
+  maxOffset.value = track.value.clientWidth - KNOB - 8;
+  // Capture on the knob itself — the target is often the arrow's <path>, which v-if swaps out.
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 }
 
 function onPointerMove(event: PointerEvent): void {
   if (!dragging.value) return;
-  offset.value = Math.min(Math.max(event.clientX - startX, 0), maxOffset);
+  offset.value = Math.min(Math.max(event.clientX - startX, 0), maxOffset.value);
 }
 
 function onPointerUp(): void {
   if (!dragging.value) return;
   dragging.value = false;
   if (progress.value > 0.85) {
-    offset.value = maxOffset;
+    offset.value = maxOffset.value;
     emit('confirm');
   } else {
     offset.value = 0;

@@ -9,6 +9,7 @@ import SearchDialog from '../components/SearchDialog.vue';
 import StateBlock from '../components/StateBlock.vue';
 import SortToggle from '../components/SortToggle.vue';
 import RangePicker from '../components/RangePicker.vue';
+import CopyButton from '../components/CopyButton.vue';
 import { getOrderListByUser, updateOnRoute } from '../api/pickup-orders';
 import { resolveParcelImageUrl } from '../api/parcels';
 import { DATE_RANGE_OPTIONS, todayRange, type DateRangeKey } from '../api/dashboard';
@@ -21,6 +22,7 @@ import { useRouteSort } from '../composables/useRouteSort';
 import { formatDistanceParts, toLatLng, type DistanceParts } from '../utils/geo';
 import RouteSummaryCard from '../components/RouteSummaryCard.vue';
 import { normalizePhone } from '../utils/inputRules';
+import { searchText, shortCode } from '../utils/codes';
 import type { PickupOrderItem, PickupOrderListResult, PickupOrderStatus } from '../types/api';
 
 const router = useRouter();
@@ -48,6 +50,8 @@ const PICKED_UP_STATUSES = new Set(['PICKED_UP']);
 const FAILED_STATUSES = new Set(['ABORT_PICK_UP', 'CANCELLED', 'DELETED']);
 // updateOnRoute only accepts these (see order.service.ts updateOnRoute).
 const ROUTABLE_STATUSES = new Set(['IN_PROGRESS', 'ON_ROUTE']);
+// One driver's pickups for the selected range fit comfortably in one page.
+const PICKUP_LIST_LIMIT = 200;
 
 const stops = computed(() => orderData.value?.results ?? []);
 
@@ -78,13 +82,21 @@ const todoStops = computed(() => stops.value.filter(isTodo));
 const routeSort = useRouteSort(() => loadPickups());
 const sortBy = routeSort.sortBy;
 
+// Order no. = the shown #XXXXXX (matched against the full id, "#" optional); a parcel's
+// tracking no. also finds its order.
 const visibleStops = computed(() => {
-  const query = orderNoQuery.value.trim().toLowerCase();
+  const query = searchText(orderNoQuery.value);
   const phoneQuery = /^[\d\s+()-]+$/.test(query) ? normalizePhone(query) : '';
   return todoStops.value.filter((item) => {
     if (!query) return true;
     if (phoneQuery.length >= 3 && normalizePhone(stopPhone(item)).includes(phoneQuery)) return true;
-    return [item.id, stopName(item), item.partner?.shop?.shopName, item.pickupAddress]
+    return [
+      item.id,
+      stopName(item),
+      item.partner?.shop?.shopName,
+      item.pickupAddress,
+      ...(item.parcels ?? []).map((parcel) => parcel.parcelUID),
+    ]
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(query));
   });
@@ -105,8 +117,10 @@ function clearSearch(): void {
   showSearch.value = false;
 }
 
+// Fires on every scroll / touchmove (App.vue): close the dialog but keep an applied
+// search — clearing it here wiped the results as soon as the driver scrolled them.
 useMobileInteraction(() => {
-  clearSearch();
+  showSearch.value = false;
   toast.clear();
 });
 const summary = computed(() => {
@@ -229,7 +243,9 @@ async function loadPickups(): Promise<void> {
   error.value = '';
   try {
     const range = DATE_RANGE_OPTIONS.find((option) => option.key === selectedRangeKey.value)?.range() ?? todayRange();
-    orderData.value = await getOrderListByUser({ ...range, ...routeSort.params() });
+    // The whole range, not the API's default page of 20 — the list, the summary counts
+    // and the (client-side) search all work from what's loaded here.
+    orderData.value = await getOrderListByUser({ ...range, ...routeSort.params() }, PICKUP_LIST_LIMIT);
   } catch (err: any) {
     error.value = err.message ?? 'Failed to load pickups';
   } finally {
@@ -374,6 +390,20 @@ onMounted(loadPickups);
             </button>
 
             <div class="stop-meta">
+              <CopyButton
+                v-slot="{ copied }"
+                class="meta-pill order-no"
+                :text="shortCode(stop.id)"
+                :aria-label="`Copy order number ${shortCode(stop.id)}`"
+              >
+                <svg v-if="copied" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" />
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+                </svg>
+                {{ copied ? 'Copied' : shortCode(stop.id) }}
+              </CopyButton>
               <span class="meta-pill">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.5" />
@@ -465,7 +495,7 @@ onMounted(loadPickups);
       v-if="showSearch"
       :initial-query="orderNoQuery"
       title="Search Pickup"
-      hint="Search order no., shop name or phone."
+      hint="Search order no., shop name, phone or parcel ID."
       placeholder="e.g. Khmerness or 010 101 010"
       @apply="applySearch"
       @close="showSearch = false"
@@ -756,6 +786,17 @@ onMounted(loadPickups);
   color: var(--text-2);
   font: 600 0.72rem var(--sans);
 }
+/* The order no. pill is a CopyButton: tap to copy. */
+.meta-pill.order-no {
+  border: none;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.meta-pill.order-no.done {
+  background: var(--green-soft);
+  color: var(--green-strong);
+}
 .meta-pill svg {
   width: 12px;
   height: 12px;
@@ -772,10 +813,16 @@ onMounted(loadPickups);
   padding: 8px 12px 8px 14px;
   border-top: 1px solid var(--divider);
 }
+/* Label under the switch: beside it, the row has no room on 360–390px phones. */
 .route-toggle {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.route-toggle .route-label {
+  font-size: 0.66rem;
 }
 .toggle {
   position: relative;
@@ -808,20 +855,25 @@ onMounted(loadPickups);
   transform: translateX(18px);
 }
 .route-label {
+  min-width: 0;
+  overflow: hidden;
   color: var(--ink);
   font: 600 0.78rem var(--sans);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .route-label.muted {
   color: var(--muted);
 }
 .quick-actions {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
   margin-left: auto;
 }
 .icon-action {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -851,11 +903,13 @@ onMounted(loadPickups);
   pointer-events: none;
 }
 .open-btn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 2px;
   height: 34px;
-  padding: 0 10px 0 12px;
+  padding: 0 8px 0 12px;
+  white-space: nowrap;
   border: none;
   border-radius: 10px;
   background: var(--green);

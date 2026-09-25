@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { getMyProfile } from '../api/users.ts';
 import { DATE_RANGE_OPTIONS, getDriverDashboard, todayRange, type DateRangeKey } from '../api/dashboard.ts';
 import {
   confirmReturnParcelFromWarehouse,
@@ -16,14 +15,13 @@ import HeaderIconButton from '../components/HeaderIconButton.vue';
 import SearchChip from '../components/SearchChip.vue';
 import SearchDialog from '../components/SearchDialog.vue';
 import StateBlock from '../components/StateBlock.vue';
-import QrCodeCard from '../components/QrCodeCard.vue';
 import RangePicker from '../components/RangePicker.vue';
 import ScanQRCodeModal from '../components/ScanQRCodeModal.vue';
 import { useOrderDetailStore } from '../stores/orderDetail';
 import { useMobileInteraction } from '../composables/useMobileInteraction';
 import { useToast } from '../composables/useToast';
 import { extractUuid, normalizePhone } from '../utils/inputRules';
-import type { AuthenticatedUser, DriverDashboardSummary } from '../types/api.ts';
+import type { DriverDashboardSummary } from '../types/api.ts';
 
 const router = useRouter();
 const orderDetail = useOrderDetailStore();
@@ -33,9 +31,7 @@ function viewDetail(item: Parcel): void {
   router.push({ name: 'parcel-detail', params: { id: item.id } });
 }
 
-const profile = ref<AuthenticatedUser | null>(null);
 const stats = ref<DriverDashboardSummary | null>(null);
-const showQr = ref(false);
 const showScan = ref(false);
 const selectedRangeKey = ref<DateRangeKey>('today');
 const rangePicker = ref<InstanceType<typeof RangePicker> | null>(null);
@@ -63,7 +59,6 @@ const toast = useToast();
 const showMessage = toast.show;
 
 useMobileInteraction(() => {
-  showQr.value = false;
   showScan.value = false;
   showSearch.value = false;
   toast.clear();
@@ -223,11 +218,6 @@ async function onQrScanned(rawValue: string): Promise<void> {
 }
 
 onMounted(async () => {
-  try {
-    profile.value = await getMyProfile();
-  } catch {
-    profile.value = null;
-  }
   await loadStats();
   loadReturnParcels();
 });
@@ -241,13 +231,6 @@ onMounted(async () => {
       <HeaderIconButton label="Search returns" :active="!!search" @click="openSearch">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-        </svg>
-      </HeaderIconButton>
-      <HeaderIconButton label="Show my QR code" @click="showQr = true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7V4a1 1 0 0 1 1-1h3M21 7V4a1 1 0 0 0-1-1h-3M3 17v3a1 1 0 0 0 1 1h3M21 17v3a1 1 0 0 1-1 1h-3" />
-          <rect x="7" y="7" width="4" height="4" /><rect x="13" y="7" width="4" height="4" />
-          <rect x="7" y="13" width="4" height="4" /><rect x="13" y="13" width="4" height="4" />
         </svg>
       </HeaderIconButton>
     </BrandHeader>
@@ -420,7 +403,6 @@ onMounted(async () => {
     />
 
     <AppToast :message="toast.message.value" :type="toast.type.value" />
-    <QrCodeCard v-if="showQr" :profile="profile" @close="showQr = false" />
 
     <ScanQRCodeModal
       v-if="showScan"

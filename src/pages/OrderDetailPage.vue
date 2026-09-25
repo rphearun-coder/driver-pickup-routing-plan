@@ -5,6 +5,7 @@ import AddParcelSheet from '../components/AddParcelSheet.vue';
 import ParcelsListSection, { type ParcelRow } from '../components/ParcelsListSection.vue';
 import AppToast from '../components/AppToast.vue';
 import ScanQRCodeModal from '../components/ScanQRCodeModal.vue';
+import CopyButton from '../components/CopyButton.vue';
 import { useToast, type ToastType } from '../composables/useToast';
 import {
   confirmPickup,
@@ -16,6 +17,7 @@ import {
 import { getBeReturnParcels, resolveParcelImageUrl } from '../api/parcels';
 import { useOrderDetailStore } from '../stores/orderDetail';
 import type { PickupOrderStatus } from '../types/api';
+import { shortCode } from '../utils/codes';
 
 const route = useRoute();
 const router = useRouter();
@@ -78,10 +80,6 @@ const mapUrl = computed(() => {
 // driverRegisterParcelImages only accepts orders that are still being picked up.
 const editable = computed(() => order.value?.status === 'IN_PROGRESS' || order.value?.status === 'ON_ROUTE');
 const existingParcels = computed(() => order.value?.parcels ?? []);
-
-function shortCode(id: string): string {
-  return `#${id.slice(-6).toUpperCase()}`;
-}
 
 const parcelRows = computed<ParcelRow[]>(() => [
   ...existingParcels.value.map((parcel) => ({
@@ -292,6 +290,16 @@ async function onSubmit(): Promise<void> {
       </button>
       <div class="header-title">
         <h1>Pickup Details</h1>
+        <CopyButton
+          v-if="order"
+          v-slot="{ copied }"
+          class="header-sub order-no"
+          :text="shortCode(order.id)"
+          :aria-label="`Copy order number ${shortCode(order.id)}`"
+        >
+          Order {{ shortCode(order.id) }}
+          <span class="copy-hint">{{ copied ? 'Copied' : 'Copy' }}</span>
+        </CopyButton>
       </div>
       <div class="header-actions">
         <button
@@ -465,6 +473,29 @@ async function onSubmit(): Promise<void> {
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Tap to copy the order no. (a CopyButton). */
+.header-sub.order-no {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.copy-hint {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--blue);
+  font: 700 0.64rem var(--sans);
+}
+.order-no.done .copy-hint {
+  background: var(--green-soft);
+  color: var(--green-strong);
 }
 .header-sub {
   overflow: hidden;

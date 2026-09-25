@@ -12,6 +12,7 @@ import { getOperationByDriver, sendNotificationToOperation, type DriverOperator 
 import { resolveParcelImageUrl } from '../api/parcels';
 import { downloadBlob, renderSettlementReceipt, shareFile } from '../utils/settlementReceipt';
 import ImageLightbox from './ImageLightbox.vue';
+import CloseButton from './CloseButton.vue';
 
 // Read-only details of one settlement from SettlementHistoryPage. The summary comes
 // from the already-loaded list row; only the parcel list is fetched on open.
@@ -293,11 +294,7 @@ onUnmounted(() => {
 
         <div class="sheet-head">
           <h2 id="settlement-detail-title">Settlement details</h2>
-          <button type="button" class="close-btn" aria-label="Close" @click="emit('close')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-              <path d="M7 7l10 10M17 7 7 17" />
-            </svg>
-          </button>
+          <CloseButton @click="emit('close')" />
         </div>
 
         <section class="hero">
@@ -537,23 +534,6 @@ onUnmounted(() => {
   margin: 0;
   color: var(--ink);
   font: 700 1.1rem var(--heading);
-}
-.close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--fill-strong);
-  color: var(--text-3);
-  cursor: pointer;
-}
-.close-btn svg {
-  width: 16px;
-  height: 16px;
 }
 .hero {
   display: flex;

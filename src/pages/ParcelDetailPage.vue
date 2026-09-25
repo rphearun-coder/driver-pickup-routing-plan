@@ -6,6 +6,7 @@ import ReportIssueSheet from '../components/ReportIssueSheet.vue';
 import DeliveryFailedDialog from '../components/DeliveryFailedDialog.vue';
 import SwipeToConfirm from '../components/SwipeToConfirm.vue';
 import ImageLightbox from '../components/ImageLightbox.vue';
+import ContactActions from '../components/ContactActions.vue';
 import {
   confirmReturnParcel,
   confirmReturnParcelToWarehouse,
@@ -16,6 +17,7 @@ import {
   uploadParcelProof,
 } from '../api/parcels';
 import { useOrderDetailStore } from '../stores/orderDetail';
+import { formatDistanceParts, toLatLng } from '../utils/geo';
 
 const route = useRoute();
 const router = useRouter();
@@ -258,10 +260,32 @@ function formatReceiverBy(value?: string): string {
   return value === 'SELLER' ? 'Left with seller' : 'Driver';
 }
 
+// Same rules as the Deliveries list: 0,0 means no coordinates, so fall back to the address.
 const mapUrl = computed(() => {
   const item = parcel.value;
-  if (!item || item.deliveryLatitude == null || item.deliveryLongitude == null) return '#';
-  return `https://www.google.com/maps?q=${item.deliveryLatitude},${item.deliveryLongitude}`;
+  if (!item) return '';
+  const point = toLatLng(item.deliveryLatitude, item.deliveryLongitude);
+  if (point) return `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}`;
+  const address = item.location || item.deliveryAddress;
+  return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : '';
+});
+
+// codUsd is 0 (not null) on real records, so `||` falls through to price — as on the list.
+const collectAmount = computed(() => parcel.value?.codUsd || parcel.value?.price || 0);
+const trackingCode = computed(() => {
+  const item = parcel.value;
+  return item ? item.parcelUID || `#${item.id.slice(-6).toUpperCase()}` : '';
+});
+const recipientAddress = computed(() => parcel.value?.location || parcel.value?.deliveryAddress || '');
+const eta = computed(() => {
+  const item = parcel.value;
+  if (!item?.estimatedDistanceMeters) return null;
+  return formatDistanceParts(
+    item.estimatedDistanceMeters,
+    item.estimatedDurationSeconds,
+    item.estimatedDistanceMetersText,
+    item.estimatedDurationSecondsText,
+  );
 });
 
 const parcelPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.parcelImage));
@@ -279,6 +303,7 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
       </button>
       <div class="header-title">
         <h1>{{ isCodStatus ? 'Delivery Details' : 'Return Details' }}</h1>
+        <span v-if="parcel" class="header-sub mono">{{ trackingCode }}</span>
       </div>
       <span class="header-spacer" aria-hidden="true"></span>
     </header>
@@ -309,7 +334,7 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
         </div>
         <div class="result-amount">
           <span class="result-amount-label">Collected</span>
-          <strong>{{ formatUSD(parcel.totalCOD ?? parcel.codUsd) }}</strong>
+          <strong>{{ formatUSD(parcel.totalCOD || collectAmount) }}</strong>
           <span v-if="parcel.codRiel" class="result-khr">+ {{ Math.round(parcel.codRiel).toLocaleString() }}៛</span>
         </div>
       </section>
@@ -326,40 +351,62 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
         </div>
       </section>
 
-      <div class="cod-card">
-        <div class="cod-row">
-          <span>Seller name</span>
-          <strong class="seller">{{ parcelSellerName(parcel) || '—' }}</strong>
+      <!-- What the driver needs first: how much to collect, and how far it is. -->
+      <section v-if="parcel.status === 'ON_DELIVERY'" class="collect-card">
+        <div class="collect-main">
+          <span class="collect-label">To collect</span>
+          <strong class="collect-amount">{{ formatUSD(collectAmount) }}</strong>
+          <span v-if="parcel.codRiel" class="collect-khr">+ {{ Math.round(parcel.codRiel).toLocaleString() }}៛</span>
         </div>
-        <div class="cod-row">
-          <span>Price</span>
-          <strong class="price">{{ formatUSD(parcel.price) }}</strong>
-        </div>
-        <div class="cod-row">
-          <span>Phone number</span>
-          <a v-if="parcel.recipientNumber" class="link-value" :href="`tel:${parcel.recipientNumber}`">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 4h3.5l1.5 4.5-2 1.5a11 11 0 0 0 6 6l1.5-2 4.5 1.5V19a1.5 1.5 0 0 1-1.5 1.5A15.5 15.5 0 0 1 3.5 5.5 1.5 1.5 0 0 1 5 4z" />
-            </svg>
-            {{ parcel.recipientNumber }}
-          </a>
-          <strong v-else>—</strong>
-        </div>
-        <div class="cod-row">
-          <span>Recipient location</span>
-          <a v-if="parcel.location && mapUrl !== '#'" class="link-value" :href="mapUrl" target="_blank" rel="noopener">
+        <div v-if="eta" class="collect-eta">
+          <span class="eta-pill">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
             </svg>
-            {{ parcel.location }}
-          </a>
-          <strong v-else>{{ parcel.location || '—' }}</strong>
+            {{ eta.distanceText }}
+          </span>
+          <span class="eta-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+            {{ eta.durationText }}
+          </span>
         </div>
-        <div v-if="parcel.status === 'SUCCESS'" class="cod-row">
-          <span>Collected by</span>
-          <strong>{{ formatReceiverBy(parcel.receiverBy) }}</strong>
+      </section>
+
+      <section class="card">
+        <p class="card-label">Deliver to</p>
+        <div class="seller-row">
+          <span class="seller-avatar recipient">{{ (parcel.recipientName || '?').charAt(0).toUpperCase() }}</span>
+          <div class="seller-info">
+            <p class="seller-name">{{ parcel.recipientName || 'Recipient' }}</p>
+            <p class="seller-address">{{ recipientAddress || 'No address' }}</p>
+          </div>
         </div>
-      </div>
+        <ContactActions :phone="parcel.recipientNumber" :map-url="mapUrl" />
+      </section>
+
+      <section class="card">
+        <p class="card-label">Parcel</p>
+        <div class="info-grid">
+          <div class="info-item wide">
+            <span>Tracking no.</span>
+            <strong class="mono">{{ trackingCode }}</strong>
+          </div>
+          <div class="info-item" :class="{ wide: parcel.status === 'ON_DELIVERY' }">
+            <span>Seller</span>
+            <strong>{{ parcelSellerName(parcel) || '—' }}</strong>
+          </div>
+          <div v-if="parcel.status !== 'ON_DELIVERY'" class="info-item">
+            <span>Price</span>
+            <strong>{{ formatUSD(collectAmount) }}</strong>
+          </div>
+          <div v-if="parcel.status === 'SUCCESS'" class="info-item">
+            <span>Collected by</span>
+            <strong>{{ formatReceiverBy(parcel.receiverBy) }}</strong>
+          </div>
+        </div>
+      </section>
 
       <template v-if="parcel.status !== 'ON_DELIVERY'">
         <div class="photo-grid">
@@ -386,42 +433,41 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
       </template>
 
       <template v-if="parcel.status === 'ON_DELIVERY'">
-        <button
-          v-if="receiptPhotoUrl"
-          type="button"
-          class="photo-card"
-          aria-label="View receipt photo"
-          @click="photoViewUrl = receiptPhotoUrl"
-        >
-          <img :src="receiptPhotoUrl" alt="Receipt photo" />
-        </button>
-
-        <div class="photo-card editable" :class="{ empty: !parcelPhotoUrl }">
-          <button
-            v-if="parcelPhotoUrl"
-            type="button"
-            class="photo-view"
-            aria-label="View parcel photo"
-            @click="photoViewUrl = parcelPhotoUrl"
-          >
-            <img :src="parcelPhotoUrl" alt="Parcel photo" />
-          </button>
-          <button v-else type="button" class="photo-view placeholder" @click="pickNewPhoto">
-            <span>No parcel photo — tap to take one</span>
-          </button>
-          <button
-            type="button"
-            class="camera-btn"
-            :disabled="photoUpdating"
-            aria-label="Retake parcel photo"
-            title="Retake parcel photo"
-            @click="pickNewPhoto"
-          >
-            <span v-if="photoUpdating" class="mini-spinner" aria-hidden="true"></span>
-            <svg v-else viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9 4.5 7.6 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2.6L15 4.5zM12 17a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-            </svg>
-          </button>
+        <div class="photo-grid two">
+          <figure class="photo-tile editable">
+            <button
+              v-if="parcelPhotoUrl"
+              type="button"
+              class="photo-tile-btn"
+              aria-label="View parcel photo"
+              @click="photoViewUrl = parcelPhotoUrl"
+            >
+              <img :src="parcelPhotoUrl" alt="Parcel photo" loading="lazy" />
+            </button>
+            <button v-else type="button" class="photo-tile-btn placeholder" @click="pickNewPhoto">
+              <span>Tap to take a photo</span>
+            </button>
+            <button
+              type="button"
+              class="camera-btn"
+              :disabled="photoUpdating"
+              aria-label="Retake parcel photo"
+              title="Retake parcel photo"
+              @click="pickNewPhoto"
+            >
+              <span v-if="photoUpdating" class="mini-spinner" aria-hidden="true"></span>
+              <svg v-else viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 4.5 7.6 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2.6L15 4.5zM12 17a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+              </svg>
+            </button>
+            <figcaption>Parcel photo</figcaption>
+          </figure>
+          <figure v-if="receiptPhotoUrl" class="photo-tile">
+            <button type="button" class="photo-tile-btn" aria-label="View receipt photo" @click="photoViewUrl = receiptPhotoUrl">
+              <img :src="receiptPhotoUrl" alt="Receipt photo" loading="lazy" />
+            </button>
+            <figcaption>Receipt photo</figcaption>
+          </figure>
         </div>
         <input ref="photoInput" type="file" accept="image/*" capture="environment" class="file-input" @change="onNewPhoto" />
         <p v-if="photoError" class="error-text">{{ photoError }}</p>
@@ -476,26 +522,7 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
             <p v-if="sellerAddress" class="seller-address">{{ sellerAddress }}</p>
           </div>
         </div>
-        <div class="contact-actions">
-          <a class="contact-btn call" :class="{ disabled: !sellerPhone }" :href="sellerPhone ? `tel:${sellerPhone}` : undefined">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 4h3.5l1.5 4.5-2 1.5a11 11 0 0 0 6 6l1.5-2 4.5 1.5V19a1.5 1.5 0 0 1-1.5 1.5A15.5 15.5 0 0 1 3.5 5.5 1.5 1.5 0 0 1 5 4z" />
-            </svg>
-            {{ sellerPhone || 'No phone' }}
-          </a>
-          <a
-            class="contact-btn map"
-            :class="{ disabled: !sellerMapUrl }"
-            :href="sellerMapUrl || undefined"
-            target="_blank"
-            rel="noopener"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 11l18-8-8 18-2-8z" />
-            </svg>
-            Directions
-          </a>
-        </div>
+        <ContactActions :phone="sellerPhone" :map-url="sellerMapUrl" />
       </section>
 
       <section class="card">
@@ -672,69 +699,97 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
   margin: 0 auto;
   padding: 16px 16px 24px;
 }
-.photo-card {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 230px;
-  margin-top: 14px;
-  padding: 0;
-  border: none;
+.header-sub.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.collect-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
   border-radius: 18px;
-  background: #fff;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.08);
-  cursor: zoom-in;
+  background: linear-gradient(135deg, #1f8a2c, #2fae3a);
+  box-shadow: 0 8px 22px rgba(42, 154, 46, 0.28);
+  color: #fff;
 }
-.photo-card img,
-.photo-view img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #fafafa;
+.collect-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
-.photo-card.editable {
-  cursor: default;
+.collect-label {
+  opacity: 0.85;
+  font: 600 0.7rem var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-.photo-view {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: zoom-in;
+.collect-amount {
+  font: 800 1.9rem var(--sans);
+  line-height: 1.15;
 }
-.photo-view.placeholder {
+.collect-khr {
+  opacity: 0.9;
+  font: 600 0.85rem var(--sans);
+}
+.collect-eta {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.eta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font: 700 0.75rem var(--sans);
+  white-space: nowrap;
+}
+.eta-pill svg {
+  width: 14px;
+  height: 14px;
+}
+.seller-avatar.recipient {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.photo-tile.editable {
+  position: relative;
+}
+.photo-tile-btn.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1.5px dashed var(--disabled);
-  border-radius: 18px;
+  border-radius: 16px 16px 0 0;
   color: var(--muted);
-  font: 600 0.85rem var(--sans);
+  font: 600 0.8rem var(--sans);
   cursor: pointer;
 }
 .camera-btn {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   color: var(--ink-strong);
   box-shadow: 0 2px 10px rgba(17, 24, 39, 0.18);
   cursor: pointer;
 }
 .camera-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 .mini-spinner {
   width: 18px;
@@ -831,6 +886,10 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   margin-top: 14px;
+}
+/* Delivery photos: always two columns so a lone tile stays thumbnail-sized. */
+.photo-grid.two {
+  grid-template-columns: 1fr 1fr;
 }
 .photo-tile {
   margin: 0;
@@ -978,43 +1037,6 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.35;
-}
-.contact-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-.contact-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  height: 42px;
-  padding: 0 10px;
-  border-radius: 12px;
-  font: 700 0.82rem var(--sans);
-  text-decoration: none;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.contact-btn svg {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-}
-.contact-btn.call {
-  background: var(--green-soft);
-  color: var(--green-strong);
-}
-.contact-btn.map {
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-.contact-btn.disabled {
-  opacity: 0.4;
-  pointer-events: none;
 }
 .info-grid {
   display: grid;
@@ -1209,53 +1231,6 @@ const failedPhotoUrl = computed(() => resolveParcelImageUrl(parcel.value?.proofO
 }
 .detail-body {
   padding: 32px 16px 40px;
-}
-.cod-card {
-  padding: 6px 16px;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.05);
-}
-.cod-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  color: var(--muted);
-  font: 400 0.95rem var(--sans);
-}
-.cod-row + .cod-row {
-  border-top: 1px solid var(--divider);
-}
-.cod-row strong,
-.cod-row a {
-  min-width: 0;
-  color: var(--ink);
-  font: 500 0.95rem var(--sans);
-  text-align: right;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.cod-row .seller {
-  font-weight: 700;
-}
-.cod-row .price {
-  font: 800 1.15rem var(--sans);
-}
-.cod-row .link-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--blue);
-}
-.cod-row .link-value svg {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-}
-.cod-row .amount {
-  color: var(--green);
 }
 .issue-banner {
   display: flex;
